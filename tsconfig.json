@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES6",                // Modernes JavaScript
+    "module": "commonjs",           // Standard für Node/Electron
+    "outDir": "./dist",             // Wohin der fertige JS-Code kommt
+    "rootDir": "./src",             // Wo dein TS-Code liegt
+    "strict": true,
+    "esModuleInterop": true
+  }
+}

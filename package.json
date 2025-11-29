@@ -1,0 +1,18 @@
+{
+  "name": "Chemable",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+ "scripts": {
+  "build": "tsc",
+  "start": "tsc && electron dist/main.js"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^39.2.4",
+    "typescript": "^5.9.3"
+  }
+}
