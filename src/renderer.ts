@@ -1,3 +1,4 @@
+import { periodicTable, ElementData } from "./pse";
 //Interfaces immer mit kapitalem Anfangsbuchstaben
 interface Atom {
     id: number;
@@ -9,8 +10,9 @@ interface Atom {
 interface Bond {
     id1: number;
     id2: number;
-    type: number; // 1: Single; 2: Double; 3: Triple; 4: Keil (vorne); 5: Keil(hinten)
+    type: number; // 1: Single; 2: Double; 3: Triple; [4: Keil (vorne); 5: Keil(hinten) noch nicht implementiert]
 }
+
 
 interface EditorState {
     atoms: Atom[];
@@ -27,6 +29,36 @@ let bonds: Bond[] = [];
 let currentElement = "C";
 let nextId = 1;
 let selectedAtom: Atom | null = null;
+let clickedAtom: Atom | null = null;
+
+function angleCalculator(id1: number, id2: number) {
+
+    const dx = getAtomByID(id1)!.x - getAtomByID(id2)!.x;
+    const dy = getAtomByID(id1)!.y - getAtomByID(id2)!.y;
+    const angle = Math.PI/3 + Math.atan2(dy,dx);
+    return angle
+}
+
+function newAtomPosition(clickedAtom: Atom) {
+    const verbundeneBindungen = bonds.filter(b => b.id1 === clickedAtom.id || b.id2 === clickedAtom.id);
+    if (verbundeneBindungen.length == 0) {
+        const startid = clickedAtom.id;
+        const newx = Math.cos(-Math.PI / 6) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.x;
+        const newy = Math.sin(-Math.PI / 6) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.y;
+        return [newx, newy]
+    } else if (verbundeneBindungen.length == 1) {
+        const startid = clickedAtom.id;
+        let idbefore;
+        if (verbundeneBindungen[0].id1 == startid) {
+            idbefore = verbundeneBindungen[0].id2;
+        } else {
+            idbefore = verbundeneBindungen[0].id1;
+        }
+        const newx = Math.cos(angleCalculator(startid, idbefore)) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.x;
+        const newy = Math.sin(angleCalculator(startid, idbefore)) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.y;
+        return [newx, newy]
+    }
+}
 
 //Canvaszugriff
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
@@ -248,40 +280,39 @@ canvas.addEventListener('click', (event) => {
     const clickedBond = getBondAtCoords(x, y);
 
     if (clickedAtom) {
+        // Fall A: Atom angeklickt -> Skelett-Modus: Neues Atom anbauen!
+        
+        // 1. Koordinaten berechnen 
+        const pos = newAtomPosition(clickedAtom);
+        
+        if (pos) { // Nur wenn Berechnung geklappt hat
+            saveState(); // WICHTIG: Erst speichern für Undo!
 
-        if (selectedAtom === null) {
-            selectedAtom = clickedAtom;
-        } else {
-            const atom1 = selectedAtom;
-            const atom2 = clickedAtom;
-            
-            if (atom1.id !== atom2.id) {
-                // Prüfen, ob Bindung schon existiert 
-                const exists = bonds.some(b => 
-                    (b.id1 === atom1.id && b.id2 === atom2.id) ||
-                    (b.id1 === atom2.id && b.id2 === atom1.id)
-                );
+            // 2. Neues Atom
+            const newAtom: Atom = {
+                id: nextId++,
+                element: "C", // Standardmäßig Kohlenstoff für Skelett
+                x: pos[0],
+                y: pos[1]
+            };
+            atoms.push(newAtom);
 
-                if (!exists) {
-                    saveState();
-                    const newBond: Bond = {
-                        id1: atom1.id,
-                        id2: atom2.id,
-                        type: 1 // Standard
-                    };
-                    saveState();
-                    bonds.push(newBond);
-                }
-                selectedAtom = null;
-            }
+            // 3. Bindung erstellen 
+            const newBond: Bond = {
+                id1: clickedAtom.id,
+                id2: newAtom.id,
+                type: 1
+            };
+            bonds.push(newBond);
         }
-    } 
-    else if (clickedBond) {
+
+        selectedAtom = null;
+    } else if (clickedBond) {
         saveState();
         if (clickedBond.type === 1) {
             clickedBond.type = 2; // Zu Doppelbindung
         } else if (clickedBond.type === 2) {
-            clickedBond.type = 3; // Zu Dreifachbindung (noch nicht visualisiert)
+            clickedBond.type = 3; // Zu Dreifachbindung
         } else {
             clickedBond.type = 1; // Zurück zu Einfach
         }
@@ -305,6 +336,7 @@ if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
 });
 
 function clearAll() {
+    saveState();
     atoms = [];
     bonds = [];
     nextId = 1;
@@ -324,6 +356,10 @@ document.getElementById('btn-o')?.addEventListener('click', () => {
 
 document.getElementById('btn-undo')?.addEventListener('click', () => {
     undo();
+})
+
+document.getElementById('btn-clear')?.addEventListener('click', () => {
+    clearAll();
 })
 
 render();
