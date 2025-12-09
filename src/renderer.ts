@@ -1,5 +1,6 @@
 import { periodicTable, ElementData } from "./pse";
-//Interfaces immer mit kapitalem Anfangsbuchstaben
+//Interfaces immer mit großem Anfangsbuchstaben
+
 interface Atom {
     id: number;
     element: string;
@@ -12,7 +13,6 @@ interface Bond {
     id2: number;
     type: number; // 1: Single; 2: Double; 3: Triple; [4: Keil (vorne); 5: Keil(hinten) noch nicht implementiert]
 }
-
 
 interface EditorState {
     atoms: Atom[];
@@ -30,73 +30,239 @@ let currentElement = "C";
 let nextId = 1;
 let selectedAtom: Atom | null = null;
 let clickedAtom: Atom | null = null;
+let dragStartAtom: Atom | null = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let currentMouseX = 0;
+let currentMouseY = 0;
 
-function angleCalculator(id1: number, id2: number) {
+function getAngle(fromId: number, toId: number): number {
+    const atom1 = getAtomByID(fromId);
+    const atom2 = getAtomByID(toId);
+    
+    // Sicherheitscheck, falls ein Atom gelöscht wurde
+    if (!atom1 || !atom2) return 0;
 
-    const dx = getAtomByID(id1)!.x - getAtomByID(id2)!.x;
-    const dy = getAtomByID(id1)!.y - getAtomByID(id2)!.y;
-    const angle = Math.PI/3 + Math.atan2(dy,dx);
-    return angle
+    const dx = atom2.x - atom1.x;
+    const dy = atom2.y - atom1.y;
+    
+    return Math.atan2(dy, dx);
+}
+
+function getPartnerAtomId(bond: Bond, myAtomId: number): number {
+    if (bond.id1 === myAtomId) {
+        return bond.id2;
+    } else {
+        return bond.id1;
+    }
+}
+
+function findAtomNearPosition(x: number, y: number, tolerance: number, excludeId: number): Atom | null {
+    for (const atom of atoms) {
+       
+        if (atom.id === excludeId) continue;
+
+        // Abstand berechnen 
+        const dx = atom.x - x;
+        const dy = atom.y - y;
+        const distance = Math.sqrt(dx*dx + dy*dy); 
+
+        if (distance < tolerance) {
+            return atom; 
+        }
+    }
+    return null; // Nichts gefunden
 }
 
 function newAtomPosition(clickedAtom: Atom) {
-    const verbundeneBindungen = bonds.filter(b => b.id1 === clickedAtom.id || b.id2 === clickedAtom.id);
-    if (verbundeneBindungen.length == 0) {
-        const startid = clickedAtom.id;
-        const newx = Math.cos(-Math.PI / 6) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.x;
-        const newy = Math.sin(-Math.PI / 6) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.y;
-        return [newx, newy]
-    } else if (verbundeneBindungen.length == 1) {
-        const startid = clickedAtom.id;
-        let idbefore;
-        if (verbundeneBindungen[0].id1 == startid) {
-            idbefore = verbundeneBindungen[0].id2;
-        } else {
-            idbefore = verbundeneBindungen[0].id1;
-        }
-        const newx = Math.cos(angleCalculator(startid, idbefore)) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.x;
-        const newy = Math.sin(angleCalculator(startid, idbefore)) * (periodicTable[currentElement].covSingleBondRadius + periodicTable[getAtomByID(startid)!.element].covSingleBondRadius) + getAtomByID(startid)!.y;
-        return [newx, newy]
+    const startid = clickedAtom.id;
+    console.log("--- Klick auf Atom " + startid + " ---");
+    
+    // 1. Alle Bindungen finden
+    const verbundeneBindungen = bonds.filter(b => b.id1 === startid || b.id2 === startid);
+    const anzahlNachbarn = verbundeneBindungen.length;
+    console.log("Anzahl Nachbarn: " + anzahlNachbarn);
+
+    // 2. Radius festlegen (Provisorisch 60, damit wir Fehler ausschließen)
+    const radius = 60; 
+
+    let winkel = 0;
+
+    if (anzahlNachbarn === 0) {
+        // Fall 1: Erstes Atom -> Startet leicht nach oben (-30 Grad)
+        console.log("Fall: Startpunkt");
+        winkel = -Math.PI / 6;
+
+    } else if (anzahlNachbarn === 1) {
+        // Fall 2: Verlängerung
+        console.log("Fall: Kette verlängern");
+        const bond = verbundeneBindungen[0];
+        
+        // HIER nutzen wir jetzt den sicheren Helfer:
+        const idPartner = getPartnerAtomId(bond, startid);
+        console.log("Partner ist Atom " + idPartner);
+
+        // Winkel berechnen: VOM Partner ZU uns (A -> B)
+        const winkelAnkunft = getAngle(idPartner, startid);
+        
+        // Um 60 Grad abknicken
+        // (Für eine echte Zick-Zack-Linie müssten wir eigentlich prüfen, wie der VORGÄNGER war,
+        // aber für jetzt reicht +60 Grad, das ergibt Kreise/Spiralen, ist aber technisch korrekt)
+        winkel = winkelAnkunft + (Math.PI / 3); 
+
+    } else if (anzahlNachbarn === 2) {
+        // Fall 3: Verzweigung (Y-Form)
+        console.log("Fall: Verzweigung");
+        
+        // Sicher die Partner-IDs holen
+        const idPartner1 = getPartnerAtomId(verbundeneBindungen[0], startid);
+        const idPartner2 = getPartnerAtomId(verbundeneBindungen[1], startid);
+
+        const w1 = getAngle(startid, idPartner1);
+        const w2 = getAngle(startid, idPartner2);
+
+        // Vektor-Addition (Einheitskreis)
+        const dx = Math.cos(w1) + Math.cos(w2);
+        const dy = Math.sin(w1) + Math.sin(w2);
+        
+        // Winkel genau gegenüber der Resultierenden
+        winkel = Math.atan2(dy, dx) + Math.PI;
+
+    } else {
+        // Fall 4: Stern / Überfüllt
+        console.log("Fall: Stern");
+        const bond = verbundeneBindungen[anzahlNachbarn - 1]; // Letzte Bindung
+        const idPartner = getPartnerAtomId(bond, startid);
+        const wLast = getAngle(startid, idPartner);
+        
+        winkel = wLast + (Math.PI / 3);
     }
+
+    // 3. Neue Position
+    const newx = Math.cos(winkel) * radius + clickedAtom.x;
+    const newy = Math.sin(winkel) * radius + clickedAtom.y;
+
+    // Optional: Logge das Ergebnis
+    console.log("Neue Position berechnet:", newx, newy);
+
+    return [newx, newy];
 }
 
 //Canvaszugriff
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
 
-//Renderer
-function render() {
+function draw() {
+    // Sicherheitscheck: Wenn ctx null ist, brechen wir ab
     if (!ctx) return;
 
-    //Delete Button
+    // 1. Alles sauber machen
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    renderBonds();
 
-    // Atome aus dem Speicher malen können
-    atoms.forEach(atom => {
+    // ----------------------------
+    // SCHRITT A: BINDUNGEN ZEICHNEN
+    // ----------------------------
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#000000";
+
+    for (const bond of bonds) {
+        const atom1 = getAtomByID(bond.id1);
+        const atom2 = getAtomByID(bond.id2);
+
+        // Wenn ein Atom gelöscht wurde, Bindung ignorieren
+        if (!atom1 || !atom2) continue;
+
+        // Vektor-Mathematik für saubere parallele Linien
+        const dx = atom2.x - atom1.x;
+        const dy = atom2.y - atom1.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+
+        if (length === 0) continue; // Verhindert Absturz bei 0-Länge
+
+        // "Normalenvektor" berechnen (Senkrecht zur Bindung)
+        // Das sorgt dafür, dass die Doppelbindung immer im richtigen Winkel steht
+        const nx = -dy / length;
+        const ny = dx / length;
+        const offset = 4; // Pixel-Abstand der Linien bei Doppelbindung
+
         ctx.beginPath();
 
-        if (selectedAtom && selectedAtom.id === atom.id) {
-            ctx.fillStyle = "rgba(255, 0, 0, 0.4)"; // Leicht roter Kreis
-            ctx.arc(atom.x, atom.y, 20, 0, 2 * Math.PI);
-            ctx.fill();
+        if (bond.type === 1) {
+            // --- Einfachbindung ---
+            ctx.moveTo(atom1.x, atom1.y);
+            ctx.lineTo(atom2.x, atom2.y);
+
+        } else if (bond.type === 2) {
+            // --- Doppelbindung ---
+            // Linie 1 (versetzt nach oben/links)
+            ctx.moveTo(atom1.x + nx * offset, atom1.y + ny * offset);
+            ctx.lineTo(atom2.x + nx * offset, atom2.y + ny * offset);
+            // Linie 2 (versetzt nach unten/rechts)
+            ctx.moveTo(atom1.x - nx * offset, atom1.y - ny * offset);
+            ctx.lineTo(atom2.x - nx * offset, atom2.y - ny * offset);
+
+        } else if (bond.type === 3) {
+            // --- Dreifachbindung ---
+            // Linie 1 (Mitte)
+            ctx.moveTo(atom1.x, atom1.y);
+            ctx.lineTo(atom2.x, atom2.y);
+            // Linie 2 (Versatz +)
+            ctx.moveTo(atom1.x + nx * (offset + 1), atom1.y + ny * (offset + 1));
+            ctx.lineTo(atom2.x + nx * (offset + 1), atom2.y + ny * (offset + 1));
+            // Linie 3 (Versatz -)
+            ctx.moveTo(atom1.x - nx * (offset + 1), atom1.y - ny * (offset + 1));
+            ctx.lineTo(atom2.x - nx * (offset + 1), atom2.y - ny * (offset + 1));
         }
 
-        ctx.arc(atom.x, atom.y, 15, 0, 2*Math.PI);
-        ctx.fillStyle = "white";
+        ctx.stroke();
+    }
+
+    // ----------------------------
+    // SCHRITT B: ATOME ZEICHNEN
+    // ----------------------------
+    // Atome kommen NACH den Bindungen, damit sie die Linienenden verdecken
+    
+    ctx.font = "bold 14px Arial"; // Schriftart
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    for (const atom of atoms) {
+        // 1. Weißer Kreis (Hintergrund), damit Bindungen nicht durch den Text gehen
+        ctx.beginPath();
+        ctx.arc(atom.x, atom.y, 11, 0, Math.PI * 2); // Radius 11
+        ctx.fillStyle = "#FFFFFF";
         ctx.fill();
-        ctx.strokeStyle = "black";
+
+        // 2. Schwarzer Rand um das Atom (Optional - sieht oft sauberer aus)
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#000000";
         ctx.stroke();
 
-    //Elementsymbol
-        ctx.fillStyle = "black";
-        ctx.font = "bold 20px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        // 3. Das Elementsymbol (z.B. "C")
+        ctx.fillStyle = "#000000";
+        // Spezialfall: Wenn selectedAtom, dann vielleicht rot färben?
+        if (selectedAtom && selectedAtom.id === atom.id) {
+            ctx.fillStyle = "#FF0000";
+        }
+        
         ctx.fillText(atom.element, atom.x, atom.y);
+    }
 
-    });
+    // ----------------------------
+    // SCHRITT C: DRAG-VORSCHAU (Gummiband)
+    // ----------------------------
+    if (dragStartAtom) {
+        ctx.beginPath();
+        ctx.moveTo(dragStartAtom.x, dragStartAtom.y);
+        ctx.lineTo(currentMouseX, currentMouseY);
+        
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#888888"; // Grau
+        ctx.setLineDash([5, 5]); // Gestrichelt
+        ctx.stroke();
+        
+        ctx.setLineDash([]); // Zurücksetzen auf durchgezogen für den nächsten Frame
+    }
 }
 
 function saveState() {
@@ -120,7 +286,7 @@ function undo() {
     bonds = lastState!.bonds;
     nextId = lastState!.nextId;
     currentElement = lastState!.currentElement;
-    render();
+    draw();
     };
 }
 
@@ -204,7 +370,6 @@ function renderBonds() {
 }
 
 // Atome hinzufügen
-
 function addAtom(x: number, y: number) {
     const newAtom: Atom = {
         id: nextId++,
@@ -214,10 +379,8 @@ function addAtom(x: number, y: number) {
     };
     saveState();
     atoms.push(newAtom);
-    render();
+    draw();
 }
-
-// Abstand Punkt-Linie
 
 function isClickOnBond(x: number, y: number, bond: Bond): boolean {
     const atom1 = getAtomByID(bond.id1);
@@ -267,68 +430,134 @@ function getAtomAtCoords(x: number, y: number): Atom | undefined {
         return distance < clickTolerance;
     })
 }
-// Canvas Interaktionen
-canvas.addEventListener('click', (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
 
-    // 1. Prüfen: Wurde ein Atom getroffen?
-    const clickedAtom = getAtomAtCoords(x, y);
+function handleSingleClick(clickedAtom: Atom) {
+    // 1. Zielposition berechnen (Zick-Zack oder Stern)
+    const pos = newAtomPosition(clickedAtom);
     
-    // 2. Prüfen: Wurde eine Bindung getroffen?
-    const clickedBond = getBondAtCoords(x, y);
+    // 2. Schauen, ob an der Zielposition schon ein Atom ist (Ringschluss?)
+    const existingNeighbor = findAtomNearPosition(pos[0], pos[1], 20, clickedAtom.id);
 
-    if (clickedAtom) {
-        // Fall A: Atom angeklickt -> Skelett-Modus: Neues Atom anbauen!
+    if (existingNeighbor) {
+        // --- FALL A: POTENTIELLER RINGSCHLUSS ---
         
-        // 1. Koordinaten berechnen 
-        const pos = newAtomPosition(clickedAtom);
-        
-        if (pos) { // Nur wenn Berechnung geklappt hat
-            saveState(); // WICHTIG: Erst speichern für Undo!
+        // Prüfen: Existiert die Bindung schon?
+        const schonVerbunden = bonds.some(b => 
+            (b.id1 === clickedAtom.id && b.id2 === existingNeighbor.id) ||
+            (b.id1 === existingNeighbor.id && b.id2 === clickedAtom.id)
+        );
 
-            // 2. Neues Atom
-            const newAtom: Atom = {
-                id: nextId++,
-                element: "C", // Standardmäßig Kohlenstoff für Skelett
-                x: pos[0],
-                y: pos[1]
-            };
-            atoms.push(newAtom);
-
-            // 3. Bindung erstellen 
-            const newBond: Bond = {
-                id1: clickedAtom.id,
-                id2: newAtom.id,
-                type: 1
-            };
-            bonds.push(newBond);
-        }
-
-        selectedAtom = null;
-    } else if (clickedBond) {
-        saveState();
-        if (clickedBond.type === 1) {
-            clickedBond.type = 2; // Zu Doppelbindung
-        } else if (clickedBond.type === 2) {
-            clickedBond.type = 3; // Zu Dreifachbindung
+        if (schonVerbunden) {
+            console.log("Bindung existiert bereits. Abbruch.");
         } else {
-            clickedBond.type = 1; // Zurück zu Einfach
+            // ECHTER RINGSCHLUSS
+            saveState(); 
+            console.log("Ringschluss zu Atom " + existingNeighbor.id);
+            
+            bonds.push({
+                id1: clickedAtom.id,
+                id2: existingNeighbor.id,
+                type: 1
+            });
         }
+
+    } else {
+        // --- FALL B: KETTE VERLÄNGERN ---
         
-        selectedAtom = null;
-    } 
-    else {
-        // empty
-        addAtom(x, y);
-        selectedAtom = null;
+        saveState();
+
+        // Neues Atom erstellen
+        const newAtom: Atom = {
+            id: nextId++,
+            element: clickedAtom.element, // Übernimmt Element vom Vorgänger
+            x: pos[0],
+            y: pos[1]
+        };
+        atoms.push(newAtom);
+
+        // Neue Bindung erstellen
+        bonds.push({
+            id1: clickedAtom.id,
+            id2: newAtom.id,
+            type: 1
+        });
     }
     
-    render();
+    draw(); // Wichtig: Neu zeichnen!
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Koordinaten merken für die Distanz-Berechnung später
+    dragStartX = x;
+    dragStartY = y;
+
+    // Prüfen: Haben wir auf ein Atom gedrückt?
+    dragStartAtom = findAtomNearPosition(x, y, 20, -1); 
 });
 
-//keypresses
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    currentMouseX = e.clientX - rect.left;
+    currentMouseY = e.clientY - rect.top;
+
+    // Wichtig: Neu zeichnen, damit die Linie der Maus folgt!
+    draw(); 
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // --- SZENARIO 1: Wir haben ein Atom gezogen (Drag & Drop oder Klick) ---
+    if (dragStartAtom) {
+        const dragEndAtom = findAtomNearPosition(x, y, 20, -1);
+
+        if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
+            // A) Drag & Drop Verbindung ziehen
+            const exists = bonds.some(b => 
+                (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) ||
+                (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
+            );
+            if (!exists) {
+                saveState();
+                bonds.push({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: 1 });
+            }
+        } else {
+            // B) Wir haben auf dem gleichen Atom losgelassen -> Skelett-Logik!
+            handleSingleClick(dragStartAtom);
+        }
+
+        dragStartAtom = null; // Reset
+        draw();
+        return; // Fertig
+    }
+
+    // --- SZENARIO 2: Wir haben NICHT auf einem Atom gestartet ---
+    // Das heißt: Wir haben auf eine Bindung oder ins Leere geklickt.
+    
+    // Check: Wurde eine Bindung getroffen?
+    const clickedBond = getBondAtCoords(x, y); // Deine alte Funktion nutzen
+
+    if (clickedBond) {
+        // C) Bindungs-Typ ändern (Dein alter Code)
+        saveState();
+        if (clickedBond.type === 1) clickedBond.type = 2;
+        else if (clickedBond.type === 2) clickedBond.type = 3;
+        else clickedBond.type = 1;
+    } else {
+        // D) Ins Leere geklickt -> Freies Atom setzen (Dein alter Code)
+        addAtom(x, y); 
+    }
+    
+    draw();
+});
+//
+
 document.addEventListener('keydown', (event) => {
 if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
     undo();
@@ -340,7 +569,7 @@ function clearAll() {
     atoms = [];
     bonds = [];
     nextId = 1;
-    render();
+    draw();
 }
 
 // Knöpfe
@@ -362,4 +591,4 @@ document.getElementById('btn-clear')?.addEventListener('click', () => {
     clearAll();
 })
 
-render();
+draw();
