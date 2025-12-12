@@ -1,22 +1,77 @@
-import { Atom, Bond, EditorState } from "./types"
+import { Atom, Bond, EditorState } from "./types";
 
-// Die Daten sind privat (nicht direkt exportiert), damit niemand sie versehentlich überschreibt
+// --- PRIVATE DATEN (Single Source of Truth) ---
 let atoms: Atom[] = [];
 let bonds: Bond[] = [];
 let nextId = 1;
+let currentElement = "C";
 
-// Wir bieten Funktionen an, um die Daten zu lesen und zu ändern
+// Der History-Stack für Undo
+let historyState: EditorState[] = [];
+
+// --- PUBLIC INTERFACE ---
 export const state = {
+    // 1. Getter (Daten lesen)
     getAtoms: () => atoms,
     getBonds: () => bonds,
+    getCurrentElement: () => currentElement,
     
-    addAtom: (atom: Atom) => {
-        atoms.push(atom);
-        nextId++; // oder id logik anpassen
-    },
-    
+    // Generiert eine ID und zählt hoch
+    getNextId: () => nextId++, 
+
+    // 2. Setter (Daten schreiben)
     setAtoms: (newAtoms: Atom[]) => { atoms = newAtoms; },
     setBonds: (newBonds: Bond[]) => { bonds = newBonds; },
-    
-    getNextId: () => nextId++,
+    setCurrentElement: (el: string) => { currentElement = el; },
+
+    // Komfort-Funktionen zum Hinzufügen
+    addAtom: (atom: Atom) => { atoms.push(atom); },
+    addBond: (bond: Bond) => { bonds.push(bond); },
+
+    // ----------------------------
+    // HISTORY & MANAGEMENT
+    // ----------------------------
+
+    // Zustand sichern (vor jeder Änderung aufrufen!)
+    saveState: () => {
+        // WICHTIG: Wir brauchen eine "Deep Copy", sonst speichern wir nur Referenzen,
+        // die sich später mit verändern. JSON.parse/stringify ist der einfachste Weg dafür.
+        const snapshot: EditorState = {
+            atoms: JSON.parse(JSON.stringify(atoms)),
+            bonds: JSON.parse(JSON.stringify(bonds)),
+            nextId: nextId,
+            currentElement: currentElement
+        };
+        historyState.push(snapshot);
+        console.log("State saved. History size:", historyState.length);
+    },
+
+    // Schritt zurück
+    undo: (): boolean => {
+        if (historyState.length === 0) {
+            console.log("Nothing to undo.");
+            return false; // Signalisiert: "Nichts passiert"
+        }
+
+        const lastState = historyState.pop();
+        if (!lastState) return false;
+
+        // Zustand wiederherstellen
+        atoms = lastState.atoms;
+        bonds = lastState.bonds;
+        nextId = lastState.nextId;
+        currentElement = lastState.currentElement;
+
+        console.log("Undo successful. Atoms:", atoms.length);
+        return true; // Signalisiert: "Daten geändert, bitte neu zeichnen!"
+    },
+
+    // Alles löschen
+    clear: () => {
+        state.saveState(); // Erst sichern!
+        atoms = [];
+        bonds = [];
+        nextId = 1;
+        // currentElement behalten wir meistens bei
+    }
 };
