@@ -7,15 +7,20 @@
   <body>
     <h1>Chemie Editor Alpha</h1>
     <p>Hier entsteht eine Alternative zu ChemDraw.</p>
-    <div id="toolbar">
-      <button id="btn-c">C (Carbon)</button>
-      <button id="btn-o">O (Oxygen)</button>
+    <div id="toolbar" style="margin-bottom: 10px;">
+      <button id="btn-draw" style="font-weight:bold; background-color:#ddd;">✏️ Zeichnen</button>
+      <button id="btn-move">cw✋ Verschieben</button>
+      <span style="margin: 0 10px; border-left: 1px solid #ccc;"></span>
+      <button id="btn-c">C</button>
+      <button id="btn-o">O</button>
       <button id="btn-undo">Undo</button>
       <button id="btn-clear">Clear</button>
+      <button id="btn-warnings" style="background-color: #ffcccc;">⚠️ Warnungen: AN</button>
+      <button id="btn-erase">Radierer</button>
     </div>
     <canvas id="chemBoard" width="800" height="600" style="border:1px solid #ccc; cursor: crosshair;"></canvas>
     <script>
       require('./dist/renderer.js');
     </script>
   </body>
-</html>tja
+</html>

@@ -1,25 +1,7 @@
-import { periodicTable, ElementData } from "./pse";
+import { periodicTable } from "./pse";
+import { Atom, Bond, EditorState} from "./types.js"
+
 //Interfaces immer mit großem Anfangsbuchstaben
-
-interface Atom {
-    id: number;
-    element: string;
-    x: number;
-    y: number;
-}
-
-interface Bond {
-    id1: number;
-    id2: number;
-    type: number; // 1: Single; 2: Double; 3: Triple; [4: Keil (vorne); 5: Keil(hinten) noch nicht implementiert]
-}
-
-interface EditorState {
-    atoms: Atom[];
-    bonds: Bond[];
-    nextId: number;
-    currentElement: string;
-}
 
 let historyState: EditorState[] = [];
 
@@ -35,6 +17,10 @@ let dragStartX = 0;
 let dragStartY = 0;
 let currentMouseX = 0;
 let currentMouseY = 0;
+let editMode: "draw" | "move" | "erase" = "draw";
+let movingAtom: Atom | null = null;
+let showValenceWarnings = true;
+
 
 function getAngle(fromId: number, toId: number): number {
     const atom1 = getAtomByID(fromId);
@@ -74,78 +60,113 @@ function findAtomNearPosition(x: number, y: number, tolerance: number, excludeId
     return null; // Nichts gefunden
 }
 
+// Prüft, ob ein Winkel an einem Atom noch frei ist
+function isAngleFree(centerId: number, angleToCheck: number): boolean {
+    const neighbors = bonds.filter(b => b.id1 === centerId || b.id2 === centerId);
+    
+    for (const bond of neighbors) {
+        const partnerId = (bond.id1 === centerId) ? bond.id2 : bond.id1;
+        const angleExisting = getAngle(centerId, partnerId);
+        
+        // Winkel-Differenz berechnen
+        const diff = Math.atan2(Math.sin(angleToCheck - angleExisting), Math.cos(angleToCheck - angleExisting));
+        
+        // Wenn der Winkel zu ähnlich ist (< 15 Grad), ist er belegt
+        if (Math.abs(diff) < 0.26) { 
+            return false;
+        }
+    }
+    return true;
+}
+
 function newAtomPosition(clickedAtom: Atom) {
     const startid = clickedAtom.id;
-    console.log("--- Klick auf Atom " + startid + " ---");
-    
-    // 1. Alle Bindungen finden
     const verbundeneBindungen = bonds.filter(b => b.id1 === startid || b.id2 === startid);
     const anzahlNachbarn = verbundeneBindungen.length;
-    console.log("Anzahl Nachbarn: " + anzahlNachbarn);
 
-    // 2. Radius festlegen (Provisorisch 60, damit wir Fehler ausschließen)
+    // Radius holen (Hier nehmen wir den Radius des AKTUELLEN Elements + des Clickt-Atoms)
+    // Vereinfacht für den Moment fest:
     const radius = 60; 
 
     let winkel = 0;
 
     if (anzahlNachbarn === 0) {
-        // Fall 1: Erstes Atom -> Startet leicht nach oben (-30 Grad)
-        console.log("Fall: Startpunkt");
         winkel = -Math.PI / 6;
-
     } else if (anzahlNachbarn === 1) {
-        // Fall 2: Verlängerung
-        console.log("Fall: Kette verlängern");
         const bond = verbundeneBindungen[0];
-        
-        // HIER nutzen wir jetzt den sicheren Helfer:
         const idPartner = getPartnerAtomId(bond, startid);
-        console.log("Partner ist Atom " + idPartner);
-
-        // Winkel berechnen: VOM Partner ZU uns (A -> B)
         const winkelAnkunft = getAngle(idPartner, startid);
-        
-        // Um 60 Grad abknicken
-        // (Für eine echte Zick-Zack-Linie müssten wir eigentlich prüfen, wie der VORGÄNGER war,
-        // aber für jetzt reicht +60 Grad, das ergibt Kreise/Spiralen, ist aber technisch korrekt)
         winkel = winkelAnkunft + (Math.PI / 3); 
-
     } else if (anzahlNachbarn === 2) {
-        // Fall 3: Verzweigung (Y-Form)
-        console.log("Fall: Verzweigung");
-        
-        // Sicher die Partner-IDs holen
         const idPartner1 = getPartnerAtomId(verbundeneBindungen[0], startid);
         const idPartner2 = getPartnerAtomId(verbundeneBindungen[1], startid);
-
         const w1 = getAngle(startid, idPartner1);
         const w2 = getAngle(startid, idPartner2);
-
-        // Vektor-Addition (Einheitskreis)
         const dx = Math.cos(w1) + Math.cos(w2);
         const dy = Math.sin(w1) + Math.sin(w2);
-        
-        // Winkel genau gegenüber der Resultierenden
         winkel = Math.atan2(dy, dx) + Math.PI;
-
     } else {
-        // Fall 4: Stern / Überfüllt
-        console.log("Fall: Stern");
-        const bond = verbundeneBindungen[anzahlNachbarn - 1]; // Letzte Bindung
+        const bond = verbundeneBindungen[anzahlNachbarn - 1];
         const idPartner = getPartnerAtomId(bond, startid);
         const wLast = getAngle(startid, idPartner);
-        
         winkel = wLast + (Math.PI / 3);
     }
 
-    // 3. Neue Position
+    // --- KOLLISIONS-CHECK (Neu) ---
+    // Wenn der Winkel belegt ist, drehen wir weiter
+    let attempts = 0;
+    while (!isAngleFree(startid, winkel) && attempts < 36) {
+        winkel += 0.3; // ca. 17 Grad weiterdrehen
+        attempts++;
+    }
+
     const newx = Math.cos(winkel) * radius + clickedAtom.x;
     const newy = Math.sin(winkel) * radius + clickedAtom.y;
 
-    // Optional: Logge das Ergebnis
-    console.log("Neue Position berechnet:", newx, newy);
-
     return [newx, newy];
+}
+
+// Subscript-Mapping 
+const SUBSCRIPT_NUMBERS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+
+function toSubscript(num: number): string {
+    return num.toString().split('').map(d => SUBSCRIPT_NUMBERS[parseInt(d)] || d).join('');
+}
+
+function getImplicitHydrogens(atom: Atom): number {
+    const data = periodicTable[atom.element];
+    if (!data) return 0;
+    
+    const maxValence = Math.max(...data.valency);
+    
+    let currentBonds = 0;
+    for (const bond of bonds) {
+        if (bond.id1 === atom.id || bond.id2 === atom.id) {
+            currentBonds += bond.type; // Doppelbindung zählt 2, Dreifach 3
+        }
+    }
+    
+    return Math.max(0, maxValence - currentBonds);
+}
+
+function getAtomLabel(atom: Atom): string {
+    const hCount = getImplicitHydrogens(atom);
+    
+    // --- SONDERFALL KOHLENSTOFF ---
+    if (atom.element === "C") {
+        // Wenn C noch volle 4 H hat (isoliert), zeigen wir "CH₄"
+        if (hCount === 4) {
+            return "CH" + toSubscript(4);
+        }
+        // Sobald Bindungen da sind (hCount < 4), zeigen wir GAR NICHTS (Skelett)
+        return ""; 
+    }
+
+    // --- ALLE ANDEREN ELEMENTE (O, N, etc.) ---
+    // Hier zeigen wir das Element + H an (z.B. "OH" oder "NH₂")
+    if (hCount === 0) return atom.element;
+    if (hCount === 1) return atom.element + "H";
+    return atom.element + "H" + toSubscript(hCount);
 }
 
 //Canvaszugriff
@@ -222,30 +243,65 @@ function draw() {
     // ----------------------------
     // Atome kommen NACH den Bindungen, damit sie die Linienenden verdecken
     
-    ctx.font = "bold 14px Arial"; // Schriftart
+// ... (Bindungen wurden bereits gezeichnet) ...
+
+    // ----------------------------
+    // SCHRITT B: ATOME ZEICHNEN
+    // ----------------------------
+    ctx.font = "bold 14px Arial"; 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (const atom of atoms) {
-        // 1. Weißer Kreis (Hintergrund), damit Bindungen nicht durch den Text gehen
-        ctx.beginPath();
-        ctx.arc(atom.x, atom.y, 11, 0, Math.PI * 2); // Radius 11
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fill();
+        // 1. Label berechnen (z.B. "CH₄", "OH" oder "" für Skelett-C)
+        const label = getAtomLabel(atom);
 
-        // 2. Schwarzer Rand um das Atom (Optional - sieht oft sauberer aus)
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "#000000";
-        ctx.stroke();
-
-        // 3. Das Elementsymbol (z.B. "C")
-        ctx.fillStyle = "#000000";
-        // Spezialfall: Wenn selectedAtom, dann vielleicht rot färben?
-        if (selectedAtom && selectedAtom.id === atom.id) {
-            ctx.fillStyle = "#FF0000";
-        }
+        // --- SKELETT-MODUS ---
+        // Wenn kein Label da ist (gebundener Kohlenstoff), zeichnen wir NICHTS.
+        // Ausnahme: Wenn er selektiert ist oder einen Fehler hat, müssen wir ihn trotzdem sehen.
+        const isHiddenCarbon = (label === "");
         
-        ctx.fillText(atom.element, atom.x, atom.y);
+        const hasError = showValenceWarnings && hasValenceError(atom);
+        const isSelected = (selectedAtom && selectedAtom.id === atom.id);
+
+        // Wenn es ein unsichtbares C ist UND keine Warnung/Selektion aktiv ist -> Überspringen
+        if (isHiddenCarbon && !hasError && !isSelected) {
+            continue; 
+        }
+
+        // --- HINTERGRUND & KREIS ---
+        
+        // Warnung (Rot) im Hintergrund
+        if (hasError) {
+            ctx.beginPath();
+            ctx.arc(atom.x, atom.y, 18, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+            ctx.fill();
+        }
+
+        // Weißer Kreis (damit Bindungen nicht durch den Text gehen)
+        // Nur zeichnen, wenn wir auch Text haben oder das Atom selektiert ist
+        if (!isHiddenCarbon || isSelected) {
+            ctx.beginPath();
+            ctx.arc(atom.x, atom.y, 11, 0, Math.PI * 2); 
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fill();
+
+        }
+
+        // --- TEXT ZEICHNEN ---
+        if (!isHiddenCarbon) {
+            ctx.fillStyle = "#000000";
+            if (isSelected) ctx.fillStyle = "#FF0000"; // Selektion hat Vorrang
+            
+            ctx.fillText(label, atom.x, atom.y);
+        } else if (isSelected) {
+            // Wenn unsichtbares C selektiert ist, zeichnen wir einen kleinen roten Punkt
+            ctx.fillStyle = "#FF0000";
+            ctx.beginPath();
+            ctx.arc(atom.x, atom.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // ----------------------------
@@ -296,78 +352,6 @@ function getAtomByID(id: number): Atom | undefined {
 }
 
 //Bindungen
-function renderBonds() {
-    if (!ctx) return;
-
-    bonds.forEach(bond => {
-        const atom1 = getAtomByID(bond.id1);
-        const atom2 = getAtomByID(bond.id2);
-
-        if (atom1 && atom2) {
-
-
-                ctx.beginPath();
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = "black";
-
-            if (bond.type == 1) {
-
-                ctx.moveTo(atom1.x, atom1.y);
-                ctx.lineTo(atom2.x, atom2.y);
-                ctx.stroke();      
-                
-            } else if (bond.type == 2) {
-
-                const dx = atom2.x - atom1.x;
-                const dy = atom2.y - atom1.y;
-                const distxy = Math.sqrt(dx**2+dy**2);
-
-                if (distxy > 0) {
-
-                    const offsetX = (dy/distxy)*4
-                    const offsetY = -(dx/distxy)*4
-
-                    ctx.moveTo(atom1.x + offsetX, atom1.y + offsetY);
-                    ctx.lineTo(atom2.x + offsetX, atom2.y + offsetY);
-
-                    ctx.moveTo(atom1.x - offsetX, atom1.y - offsetY);
-                    ctx.lineTo(atom2.x - offsetX, atom2.y - offsetY);
-
-                }
-                ctx.stroke();
-
-            } else if (bond.type == 3) {
-
-                const dx = atom2.x - atom1.x;
-                const dy = atom2.y - atom1.y;
-                const distxy = Math.sqrt(dx**2+dy**2);
-
-                if (distxy > 0) {
-
-                    const offsetX = (dy/distxy)*4.5
-                    const offsetY = -(dx/distxy)*4.5
-
-                    ctx.moveTo(atom1.x + offsetX, atom1.y + offsetY);
-                    ctx.lineTo(atom2.x + offsetX, atom2.y + offsetY);
-
-                    ctx.moveTo(atom1.x, atom1.y);
-                    ctx.lineTo(atom2.x, atom2.y);
-
-                    ctx.moveTo(atom1.x - offsetX, atom1.y - offsetY);
-                    ctx.lineTo(atom2.x - offsetX, atom2.y - offsetY);
-
-                }
-                ctx.stroke();
-
-            } else if (bond.type == 4) {
-
-            } else {
-
-            }
-
-        }
-    })
-}
 
 // Atome hinzufügen
 function addAtom(x: number, y: number) {
@@ -421,104 +405,152 @@ function getBondAtCoords(x: number, y: number): Bond | undefined {
     return bonds.find(bond => isClickOnBond(x, y, bond));
 }
 
-function getAtomAtCoords(x: number, y: number): Atom | undefined {
-    const clickTolerance = 25; //25 pixel Tolleranz
-    return atoms.find(atom => {
-        const distance = Math.sqrt(
-            (atom.x -x) ** 2 + (atom.y -y) ** 2
-        );
-        return distance < clickTolerance;
-    })
-}
-
 function handleSingleClick(clickedAtom: Atom) {
-    // 1. Zielposition berechnen (Zick-Zack oder Stern)
     const pos = newAtomPosition(clickedAtom);
-    
-    // 2. Schauen, ob an der Zielposition schon ein Atom ist (Ringschluss?)
     const existingNeighbor = findAtomNearPosition(pos[0], pos[1], 20, clickedAtom.id);
 
     if (existingNeighbor) {
-        // --- FALL A: POTENTIELLER RINGSCHLUSS ---
-        
-        // Prüfen: Existiert die Bindung schon?
+        // Ringschluss
         const schonVerbunden = bonds.some(b => 
             (b.id1 === clickedAtom.id && b.id2 === existingNeighbor.id) ||
             (b.id1 === existingNeighbor.id && b.id2 === clickedAtom.id)
         );
 
-        if (schonVerbunden) {
-            console.log("Bindung existiert bereits. Abbruch.");
-        } else {
-            // ECHTER RINGSCHLUSS
+        if (!schonVerbunden) {
             saveState(); 
-            console.log("Ringschluss zu Atom " + existingNeighbor.id);
-            
             bonds.push({
                 id1: clickedAtom.id,
                 id2: existingNeighbor.id,
                 type: 1
             });
         }
-
     } else {
-        // --- FALL B: KETTE VERLÄNGERN ---
-        
+        // Kette verlängern
         saveState();
 
-        // Neues Atom erstellen
         const newAtom: Atom = {
             id: nextId++,
-            element: clickedAtom.element, // Übernimmt Element vom Vorgänger
+            element: currentElement, // <--- WICHTIG: Hier nehmen wir jetzt das ausgewählte Tool!
             x: pos[0],
             y: pos[1]
         };
         atoms.push(newAtom);
 
-        // Neue Bindung erstellen
         bonds.push({
             id1: clickedAtom.id,
             id2: newAtom.id,
             type: 1
         });
     }
-    
-    draw(); // Wichtig: Neu zeichnen!
+    draw(); 
 }
 
+function hasValenceError(atom: Atom): boolean {
+    const elementInfo = periodicTable[atom.element];
+    if (!elementInfo) return false; // Unbekannte Elemente ignorieren
+
+    // 1. Maximale Valenz aus dem PSE holen (z.B. C = 4, O = 2)
+    const maxValence = Math.max(...elementInfo.valency); 
+
+    // 2. Aktuelle Bindungen zählen (Doppelbindungen zählen doppelt!)
+    let currentBondCount = 0;
+    for (const bond of bonds) {
+        if (bond.id1 === atom.id || bond.id2 === atom.id) {
+            currentBondCount += bond.type;
+        }
+    }
+
+    // 3. Fehler melden, wenn Limit überschritten
+    return currentBondCount > maxValence;
+}
+
+function deleteAtom(atomToDelete: Atom) {
+    saveState(); // Wichtig: Erst Zustand für Undo sichern!
+
+    // 1. Atom aus der Liste entfernen
+    atoms = atoms.filter(a => a.id !== atomToDelete.id);
+
+    // 2. Alle Bindungen entfernen, die mit diesem Atom verbunden waren
+    bonds = bonds.filter(b => b.id1 !== atomToDelete.id && b.id2 !== atomToDelete.id);
+
+    draw();
+}
+
+function deleteBond(bondToDelete: Bond) {
+    saveState();
+    // Bindung entfernen (Atome bleiben erhalten)
+    bonds = bonds.filter(b => b !== bondToDelete);
+    draw();
+}
+
+// 1. MAUS DRÜCKEN
 canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Koordinaten merken für die Distanz-Berechnung später
-    dragStartX = x;
-    dragStartY = y;
+    if (editMode === "erase") {
+        // --- RADIER-MODUS ---
+        
+        // 1. Versuchen, ein Atom zu treffen
+        const atomHit = findAtomNearPosition(x, y, 20, -1);
+        if (atomHit) {
+            deleteAtom(atomHit);
+            return; // Fertig, nicht weitermachen
+        }
 
-    // Prüfen: Haben wir auf ein Atom gedrückt?
-    dragStartAtom = findAtomNearPosition(x, y, 20, -1); 
+        // 2. Falls kein Atom getroffen, schauen ob wir eine Bindung treffen
+        const bondHit = getBondAtCoords(x, y);
+        if (bondHit) {
+            deleteBond(bondHit);
+        }
+
+    } else if (editMode === "move") {
+        // --- MOVE-MODUS ---
+        movingAtom = findAtomNearPosition(x, y, 20, -1);
+
+    } else {
+        // --- DRAW-MODUS ---
+        dragStartX = x;
+        dragStartY = y;
+        dragStartAtom = findAtomNearPosition(x, y, 20, -1);
+    }
 });
 
+// 2. MAUS BEWEGEN
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     currentMouseX = e.clientX - rect.left;
     currentMouseY = e.clientY - rect.top;
 
-    // Wichtig: Neu zeichnen, damit die Linie der Maus folgt!
-    draw(); 
+    if (editMode === "move" && movingAtom) {
+        movingAtom.x = currentMouseX;
+        movingAtom.y = currentMouseY;
+        draw(); 
+    } else {
+        draw(); // Vorschau-Linie
+    }
 });
 
+// 3. MAUS LOSLASSEN
 canvas.addEventListener('mouseup', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // --- SZENARIO 1: Wir haben ein Atom gezogen (Drag & Drop oder Klick) ---
+    // 1. War es ein Klick oder ein Ziehen? (Toleranz: 10 Pixel)
+    const dx = x - dragStartX;
+    const dy = y - dragStartY;
+    const distance = Math.sqrt(dx*dx + dy*dy);
+    const wasDragging = distance > 10; 
+
+    // --- SZENARIO 1: Wir haben ein Atom gezogen ---
     if (dragStartAtom) {
+        // Haben wir auf einem existierenden Atom losgelassen?
         const dragEndAtom = findAtomNearPosition(x, y, 20, -1);
 
         if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
-            // A) Drag & Drop Verbindung ziehen
+            // A) VERBINDEN (Drag auf existierendes Atom)
             const exists = bonds.some(b => 
                 (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) ||
                 (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
@@ -527,36 +559,63 @@ canvas.addEventListener('mouseup', (e) => {
                 saveState();
                 bonds.push({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: 1 });
             }
+
         } else {
-            // B) Wir haben auf dem gleichen Atom losgelassen -> Skelett-Logik!
-            handleSingleClick(dragStartAtom);
+            // Wir haben kein Atom getroffen.
+            
+            if (wasDragging) {
+                // B) MANUELLES PLATZIEREN (Drag ins Leere)
+                // Wir erstellen ein neues Atom genau dort, wo die Maus ist.
+                saveState();
+
+                const newAtom: Atom = {
+                    id: nextId++,
+                    element: currentElement, // Das aktuell ausgewählte Element (z.B. "C" oder "O")
+                    x: x,
+                    y: y
+                };
+                atoms.push(newAtom);
+
+                // Und verbinden es mit dem Start-Atom
+                bonds.push({
+                    id1: dragStartAtom.id,
+                    id2: newAtom.id,
+                    type: 1
+                });
+
+            } else {
+                // C) AUTOMATIK / SKELETT (Klick ohne Ziehen)
+                // Deine Zick-Zack-Logik
+                handleSingleClick(dragStartAtom);
+            }
         }
 
         dragStartAtom = null; // Reset
         draw();
-        return; // Fertig
+        return; // WICHTIG: Hier beenden, damit nicht aus Versehen noch Atome im Hintergrund erstellt werden
     }
 
-    // --- SZENARIO 2: Wir haben NICHT auf einem Atom gestartet ---
-    // Das heißt: Wir haben auf eine Bindung oder ins Leere geklickt.
+    // --- SZENARIO 2: Klick ins Leere oder auf Bindung (Start war kein Atom) ---
     
-    // Check: Wurde eine Bindung getroffen?
-    const clickedBond = getBondAtCoords(x, y); // Deine alte Funktion nutzen
+    const clickedBond = getBondAtCoords(x, y);
 
     if (clickedBond) {
-        // C) Bindungs-Typ ändern (Dein alter Code)
-        saveState();
-        if (clickedBond.type === 1) clickedBond.type = 2;
-        else if (clickedBond.type === 2) clickedBond.type = 3;
-        else clickedBond.type = 1;
+        // Nur wenn NICHT gezogen wurde, ändern wir den Typ (sonst ändert man ihn beim "Drüberziehen")
+        if (!wasDragging) {
+            saveState();
+            if (clickedBond.type === 1) clickedBond.type = 2;
+            else if (clickedBond.type === 2) clickedBond.type = 3;
+            else clickedBond.type = 1;
+        }
     } else {
-        // D) Ins Leere geklickt -> Freies Atom setzen (Dein alter Code)
-        addAtom(x, y); 
+        // Freies Atom setzen (nur bei Klick)
+        if (!wasDragging) {
+            addAtom(x, y); 
+        }
     }
     
     draw();
 });
-//
 
 document.addEventListener('keydown', (event) => {
 if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -590,5 +649,55 @@ document.getElementById('btn-undo')?.addEventListener('click', () => {
 document.getElementById('btn-clear')?.addEventListener('click', () => {
     clearAll();
 })
+
+document.getElementById('btn-draw')?.addEventListener('click', () => {
+    editMode = "draw";
+    document.getElementById('btn-draw')!.style.backgroundColor = "#ddd";
+    document.getElementById('btn-move')!.style.backgroundColor = "";
+    document.getElementById('btn-erase')!.style.backgroundColor = ""; // Reset Erase
+    canvas.style.cursor = "crosshair";
+});
+
+document.getElementById('btn-move')?.addEventListener('click', () => {
+    editMode = "move";
+    document.getElementById('btn-draw')!.style.backgroundColor = "";
+    document.getElementById('btn-move')!.style.backgroundColor = "#ddd";
+    document.getElementById('btn-erase')!.style.backgroundColor = ""; // Reset Erase
+    canvas.style.cursor = "move";
+});
+
+document.getElementById('btn-warnings')?.addEventListener('click', () => {
+    showValenceWarnings = !showValenceWarnings; // Umschalten
+    
+    // Button-Text/Farbe aktualisieren für Feedback
+    const btn = document.getElementById('btn-warnings');
+    if (btn) {
+        if (showValenceWarnings) {
+            btn.innerText = "⚠️ Warnungen: AN";
+            btn.style.backgroundColor = "#ffcccc"; // Rot
+        } else {
+            btn.innerText = "Warnungen: AUS";
+            btn.style.backgroundColor = "#ccffcc"; // Grün/Grau
+        }
+    }
+    
+    draw(); // Neu zeichnen, um Kreise auszublenden/anzuzeigen
+});
+
+document.getElementById('btn-erase')?.addEventListener('click', () => {
+    editMode = "erase";
+    
+    // Visuelles Feedback (Farben zurücksetzen und Radierer markieren)
+    const btnDraw = document.getElementById('btn-draw');
+    const btnMove = document.getElementById('btn-move');
+    const btnErase = document.getElementById('btn-erase');
+
+    if(btnDraw) btnDraw.style.backgroundColor = "";
+    if(btnMove) btnMove.style.backgroundColor = "";
+    if(btnErase) btnErase.style.backgroundColor = "#ddd"; // Aktiv markieren
+    
+    canvas.style.cursor = "not-allowed"; // Oder ein anderes Symbol
+});
+
 
 draw();

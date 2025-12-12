@@ -1,0 +1,318 @@
+{
+  "H": {
+    "atomicNumber": 1,
+    "elementSymbol": "H",
+    "name": "Hydrogen",
+    "covSingleBondRadius": 32,
+    "covDoubleBondRadius": 32,
+    "covTripleBondRadius": 32,
+    "electronegativity": 2.2,
+    "valency": [
+      1
+    ],
+    "colorValue": "#FFFFFF"
+  },
+  "He": {
+    "atomicNumber": 2,
+    "elementSymbol": "He",
+    "name": "Helium",
+    "covSingleBondRadius": 46,
+    "electronegativity": 0,
+    "valency": [
+      0
+    ],
+    "colorValue": "#D9FFFF"
+  },
+  "Li": {
+    "atomicNumber": 3,
+    "elementSymbol": "Li",
+    "name": "Lithium",
+    "covSingleBondRadius": 133,
+    "covDoubleBondRadius": 124,
+    "electronegativity": 0.98,
+    "valency": [
+      1
+    ],
+    "colorValue": "#CC80FF"
+  },
+  "Be": {
+    "atomicNumber": 4,
+    "elementSymbol": "Be",
+    "name": "Beryllium",
+    "covSingleBondRadius": 102,
+    "covDoubleBondRadius": 90,
+    "covTripleBondRadius": 85,
+    "electronegativity": 1.57,
+    "valency": [
+      2
+    ],
+    "colorValue": "#C2FF00"
+  },
+  "B": {
+    "atomicNumber": 5,
+    "elementSymbol": "B",
+    "name": "Boron",
+    "covSingleBondRadius": 85,
+    "covDoubleBondRadius": 78,
+    "covTripleBondRadius": 73,
+    "electronegativity": 2.04,
+    "valency": [
+      3
+    ],
+    "colorValue": "#FFB5B5"
+  },
+  "C": {
+    "atomicNumber": 6,
+    "elementSymbol": "C",
+    "name": "Carbon",
+    "covSingleBondRadius": 75,
+    "covDoubleBondRadius": 67,
+    "covTripleBondRadius": 60,
+    "electronegativity": 2.55,
+    "valency": [
+      4
+    ],
+    "colorValue": "#909090"
+  },
+  "N": {
+    "atomicNumber": 7,
+    "elementSymbol": "N",
+    "name": "Nitrogen",
+    "covSingleBondRadius": 71,
+    "covDoubleBondRadius": 60,
+    "covTripleBondRadius": 54,
+    "electronegativity": 3.04,
+    "valency": [
+      3,
+      4
+    ],
+    "colorValue": "#3050F8"
+  },
+  "O": {
+    "atomicNumber": 8,
+    "elementSymbol": "O",
+    "name": "Oxygen",
+    "covSingleBondRadius": 63,
+    "covDoubleBondRadius": 57,
+    "covTripleBondRadius": 53,
+    "electronegativity": 3.44,
+    "valency": [
+      2
+    ],
+    "colorValue": "#FF0D0D"
+  },
+  "F": {
+    "atomicNumber": 9,
+    "elementSymbol": "F",
+    "name": "Fluorine",
+    "covSingleBondRadius": 64,
+    "covDoubleBondRadius": 59,
+    "covTripleBondRadius": 53,
+    "electronegativity": 3.98,
+    "valency": [
+      1
+    ],
+    "colorValue": "#90E050"
+  },
+  "Ne": {
+    "atomicNumber": 10,
+    "elementSymbol": "Ne",
+    "name": "Neon",
+    "covSingleBondRadius": 67,
+    "covDoubleBondRadius": 96,
+    "electronegativity": 0,
+    "valency": [
+      0
+    ],
+    "colorValue": "#B3E3F5"
+  },
+  "Na": {
+    "atomicNumber": 11,
+    "elementSymbol": "Na",
+    "name": "Sodium",
+    "covSingleBondRadius": 155,
+    "covDoubleBondRadius": 160,
+    "electronegativity": 0.93,
+    "valency": [
+      1
+    ],
+    "colorValue": "#AB5CF2"
+  },
+  "Mg": {
+    "atomicNumber": 12,
+    "elementSymbol": "Mg",
+    "name": "Magnesium",
+    "covSingleBondRadius": 139,
+    "covDoubleBondRadius": 132,
+    "covTripleBondRadius": 127,
+    "electronegativity": 1.31,
+    "valency": [
+      2
+    ],
+    "colorValue": "#8AFF00"
+  },
+  "Al": {
+    "atomicNumber": 13,
+    "elementSymbol": "Al",
+    "name": "Aluminium",
+    "covSingleBondRadius": 126,
+    "covDoubleBondRadius": 113,
+    "covTripleBondRadius": 111,
+    "electronegativity": 1.61,
+    "valency": [
+      3
+    ],
+    "colorValue": "#BFA6A6"
+  },
+  "Si": {
+    "atomicNumber": 14,
+    "elementSymbol": "Si",
+    "name": "Silicon",
+    "covSingleBondRadius": 116,
+    "covDoubleBondRadius": 107,
+    "covTripleBondRadius": 102,
+    "electronegativity": 1.9,
+    "valency": [
+      4
+    ],
+    "colorValue": "#F0C8A0"
+  },
+  "P": {
+    "atomicNumber": 15,
+    "elementSymbol": "P",
+    "name": "Phosphorus",
+    "covSingleBondRadius": 111,
+    "covDoubleBondRadius": 102,
+    "covTripleBondRadius": 94,
+    "electronegativity": 2.19,
+    "valency": [
+      3,
+      5
+    ],
+    "colorValue": "#FF8000"
+  },
+  "S": {
+    "atomicNumber": 16,
+    "elementSymbol": "S",
+    "name": "Sulfur",
+    "covSingleBondRadius": 103,
+    "covDoubleBondRadius": 94,
+    "covTripleBondRadius": 95,
+    "electronegativity": 2.58,
+    "valency": [
+      2,
+      4,
+      6
+    ],
+    "colorValue": "#FFFF30"
+  },
+  "Cl": {
+    "atomicNumber": 17,
+    "elementSymbol": "Cl",
+    "name": "Chlorine",
+    "covSingleBondRadius": 99,
+    "covDoubleBondRadius": 95,
+    "covTripleBondRadius": 93,
+    "electronegativity": 3.16,
+    "valency": [
+      1
+    ],
+    "colorValue": "#1FF01F"
+  },
+  "K": {
+    "atomicNumber": 19,
+    "elementSymbol": "K",
+    "name": "Potassium",
+    "covSingleBondRadius": 196,
+    "covDoubleBondRadius": 193,
+    "electronegativity": 0.82,
+    "valency": [
+      1
+    ],
+    "colorValue": "#8F40D4"
+  },
+  "Ca": {
+    "atomicNumber": 20,
+    "elementSymbol": "Ca",
+    "name": "Calcium",
+    "covSingleBondRadius": 171,
+    "covDoubleBondRadius": 147,
+    "covTripleBondRadius": 133,
+    "electronegativity": 1,
+    "valency": [
+      2
+    ],
+    "colorValue": "#3DFF00"
+  },
+  "Fe": {
+    "atomicNumber": 26,
+    "elementSymbol": "Fe",
+    "name": "Iron",
+    "covSingleBondRadius": 116,
+    "covDoubleBondRadius": 109,
+    "covTripleBondRadius": 102,
+    "electronegativity": 1.83,
+    "valency": [
+      2,
+      3,
+      6
+    ],
+    "colorValue": "#E06633"
+  },
+  "Cu": {
+    "atomicNumber": 29,
+    "elementSymbol": "Cu",
+    "name": "Copper",
+    "covSingleBondRadius": 112,
+    "covDoubleBondRadius": 115,
+    "electronegativity": 1.9,
+    "valency": [
+      1,
+      2
+    ],
+    "colorValue": "#C88033"
+  },
+  "Br": {
+    "atomicNumber": 35,
+    "elementSymbol": "Br",
+    "name": "Bromine",
+    "covSingleBondRadius": 114,
+    "covDoubleBondRadius": 109,
+    "covTripleBondRadius": 110,
+    "electronegativity": 2.96,
+    "valency": [
+      1
+    ],
+    "colorValue": "#A62929"
+  },
+  "I": {
+    "atomicNumber": 53,
+    "elementSymbol": "I",
+    "name": "Iodine",
+    "covSingleBondRadius": 133,
+    "covDoubleBondRadius": 127,
+    "covTripleBondRadius": 125,
+    "electronegativity": 2.66,
+    "valency": [
+      1,
+      3,
+      5,
+      7
+    ],
+    "colorValue": "#940094"
+  },
+  "Au": {
+    "atomicNumber": 79,
+    "elementSymbol": "Au",
+    "name": "Gold",
+    "covSingleBondRadius": 124,
+    "covDoubleBondRadius": 121,
+    "covTripleBondRadius": 114,
+    "electronegativity": 2.54,
+    "valency": [
+      1,
+      3
+    ],
+    "colorValue": "#FFD123"
+  }
+}
