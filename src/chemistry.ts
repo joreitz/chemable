@@ -1,3 +1,4 @@
+// src/chemistry.ts
 import { periodicTable } from "./pse";
 import { Atom, Bond } from "./types";
 import { getAngle } from "./geometry";
@@ -52,7 +53,7 @@ export function calculateNewAtomPosition(clickedAtom: Atom, bonds: Bond[], atoms
     if (neighborCount === 0) angle = -Math.PI / 6;
     else if (neighborCount === 1) {
         const partner = getPartner(connectedBonds[0]);
-        angle = getAngle(partner, clickedAtom) + (Math.PI / 3); // Zick-Zack Standard beim Zeichnen
+        angle = getAngle(partner, clickedAtom) + (Math.PI / 3); 
     } else if (neighborCount === 2) {
         const p1 = getPartner(connectedBonds[0]);
         const p2 = getPartner(connectedBonds[1]);
@@ -81,7 +82,7 @@ export function getIdealBondLength(bond: Bond, atoms: Atom[]): number {
     else if (bond.type === 2) lengthInPm = (e1.covDoubleBondRadius || e1.covSingleBondRadius) + (e2.covDoubleBondRadius || e2.covSingleBondRadius);
     else if (bond.type === 3) lengthInPm = (e1.covTripleBondRadius || e1.covSingleBondRadius) + (e2.covTripleBondRadius || e2.covSingleBondRadius);
 
-    return lengthInPm * 0.6; // Pixel-Faktor
+    return lengthInPm * 0.6; 
 }
 
 // --- CLEAN UP ALGORITHMUS ---
@@ -105,7 +106,6 @@ function recursiveLayout(
 
     if (connections.length === 0) return;
 
-    // Gesamtzahl Arme am Atom (inklusive dem, wo wir herkommen)
     const totalArms = connections.length + (incomingAngle !== null ? 1 : 0);
     
     let currentAngle = 0;
@@ -113,50 +113,29 @@ function recursiveLayout(
 
     if (incomingAngle !== null) {
         // --- MITTEN DRIN ---
-        
         if (totalArms === 2) {
             // KETTE (Zick-Zack)
-            // Wir weichen leicht von der Geraden ab (60 Grad)
             const deviation = (Math.PI / 3) * bendDirection; 
             currentAngle = incomingAngle + deviation;
-            
-            // Nächster Schritt andersrum
             nextBendDirection = bendDirection * -1; 
-
         } else {
             // VERZWEIGUNG
-            // Winkel berechnen (z.B. 120° oder 90°)
             let angleStep = (2 * Math.PI) / totalArms;
-            if (totalArms === 3) angleStep = (2 * Math.PI) / 3; // 120°
-            if (totalArms >= 4) angleStep = Math.PI / 2;       // 90°
-
-            // Spreizung berechnen
+            if (totalArms === 3) angleStep = (2 * Math.PI) / 3; 
+            if (totalArms >= 4) angleStep = Math.PI / 2;
             const spread = angleStep * (connections.length - 1);
-            
-            // WICHTIG: Startwinkel zentriert um die "Geradeaus"-Richtung
-            // (Hier war vorher der Fehler mit + Math.PI)
             currentAngle = incomingAngle - (spread / 2);
-            
-            // Bei Verzweigungen Reset des Zick-Zacks, damit Ketten danach sauber laufen
             nextBendDirection = 1;
         }
-
     } else {
         // --- STARTPUNKT ---
-        // Standard: Startet nach Rechts (-30°)
         currentAngle = -Math.PI / 6; 
-        
         if (connections.length === 2) {
-            // Spezialfall: Start ist Mitte einer Kette -> Linear starten (180° versetzt)
-            // Erster Arm nach links unten (150°), Zweiter nach rechts unten (-30°)
-            // Wir setzen den Start so, dass die Schleife das automatisch macht
-            currentAngle = (5 * Math.PI) / 6; // 150°
+            currentAngle = (5 * Math.PI) / 6; 
         } else if (connections.length > 2) {
              let angleStep = (2 * Math.PI) / connections.length;
              if (connections.length === 3) angleStep = 2*Math.PI/3;
              if (connections.length === 4) angleStep = Math.PI/2;
-             
-             // Zentrieren (dreht das ganze Molekül etwas)
              currentAngle -= (angleStep * (connections.length - 1)) / 2;
         }
     }
@@ -164,31 +143,30 @@ function recursiveLayout(
     // 2. Platzierung und Rekursion
     for (let i = 0; i < connections.length; i++) {
         const conn = connections[i];
-        const neighbor = atoms.find(a => a.id === conn.neighborId)!;
+        
+        // --- FIX: Prüfen, ob der Nachbar überhaupt in unserer Liste ist (Selektion) ---
+        const neighbor = atoms.find(a => a.id === conn.neighborId);
+        if (!neighbor) continue; 
+
         const dist = getIdealBondLength(conn.bond, atoms);
 
-        // Position setzen
         neighbor.x = rootAtom.x + Math.cos(currentAngle) * dist;
         neighbor.y = rootAtom.y + Math.sin(currentAngle) * dist;
 
-        // Absteigen
         recursiveLayout(neighbor.id, atoms, bonds, visited, currentAngle, nextBendDirection);
 
-        // Winkel weiterdrehen für den nächsten Nachbarn am selben Atom
+        // Winkel weiterdrehen
         if (connections.length > 1) {
              let step = (2 * Math.PI) / totalArms;
-             // Startpunkt Sonderbehandlung für schöne Winkel
              if (incomingAngle === null) {
                  step = (2 * Math.PI) / connections.length;
                  if (connections.length === 3) step = 2*Math.PI/3;
                  if (connections.length === 4) step = Math.PI/2;
-                 if (connections.length === 2) step = Math.PI; // 180° für Start-Kette
+                 if (connections.length === 2) step = Math.PI; 
              } else {
                  if (totalArms === 3) step = (2 * Math.PI) / 3;
                  if (totalArms >= 4) step = Math.PI / 2;
              }
-             
-             // Bei Ketten (totalArms=2) passiert das hier nicht, da loop nur 1x läuft
              currentAngle += step;
         }
     }
@@ -197,8 +175,6 @@ function recursiveLayout(
 export function applyAutoLayout(atoms: Atom[], bonds: Bond[]) {
     if (atoms.length === 0) return;
     const visited = new Set<number>();
-    
-    // Wir sortieren das Start-Atom so, dass wir möglichst am Ende einer Kette starten 
-    // oder an einem zentralen Punkt. Für jetzt reicht atoms[0].
+    // Start beim ersten Atom der übergebenen Liste
     recursiveLayout(atoms[0].id, atoms, bonds, visited, null, 1);
 }

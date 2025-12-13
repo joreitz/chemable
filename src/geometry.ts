@@ -94,3 +94,41 @@ export function calculateBondOffsetDirection(
     // Also zeichnen wir den zweiten Strich auch rechts.
     return sumDot >= 0 ? 1 : -1;
 }
+// Ray-Casting-Algorithmus
+// src/math.ts
+
+export function isPointInPolygon(p: {x: number, y: number}, polygon: {x: number, y: number}[]): boolean {
+    let isInside = false;
+    
+    // Sicherheit: Wenn das Polygon leer ist, raus hier
+    if (polygon.length < 3) return false;
+
+    let minX = polygon[0].x, maxX = polygon[0].x;
+    let minY = polygon[0].y, maxY = polygon[0].y;
+    
+    // 1. Bounding Box Check
+    for (const point of polygon) {
+        minX = Math.min(point.x, minX);
+        maxX = Math.max(point.x, maxX);
+        minY = Math.min(point.y, minY);
+        maxY = Math.max(point.y, maxY);
+    }
+
+    if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) {
+        return false;
+    }
+
+    // 2. Ray-Casting Algorithmus (Korrigierte Schleife)
+    // Wir definieren i und j direkt im Loop-Header
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const pi = polygon[i];
+        const pj = polygon[j];
+
+        const intersect = ((pi.y > p.y) !== (pj.y > p.y)) &&
+            (p.x < (pj.x - pi.x) * (p.y - pi.y) / (pj.y - pi.y) + pi.x);
+
+        if (intersect) isInside = !isInside;
+    }
+    
+    return isInside;
+}

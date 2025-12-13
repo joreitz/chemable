@@ -5,8 +5,7 @@ let atoms: Atom[] = [];
 let bonds: Bond[] = [];
 let nextId = 1;
 let currentElement = "C";
-
-// Der History-Stack für Undo
+let selectedAtomIDs = new Set<number>();
 let historyState: EditorState[] = [];
 
 // --- PUBLIC INTERFACE ---
@@ -46,6 +45,21 @@ export const state = {
         console.log("State saved. History size:", historyState.length);
     },
 
+    getSelectedAtomIds: () => selectedAtomIDs,
+    selectAtoms: (ids: number[]) => {
+        selectedAtomIDs = new Set(ids);
+    },
+
+    addToSelection: (ids: number[]) => {
+        ids.forEach(id => selectedAtomIDs.add(id));
+    },
+
+    clearSelection: () => {
+        selectedAtomIDs.clear();
+    },
+
+    isSelected: (atomId: number) => selectedAtomIDs.has(atomId),
+
     // Schritt zurück
     undo: (): boolean => {
         if (historyState.length === 0) {
@@ -74,4 +88,6 @@ export const state = {
         nextId = 1;
         // currentElement behalten wir meistens bei
     }
-};
+
+    //Lasso
+}

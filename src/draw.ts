@@ -1,4 +1,6 @@
 // src/draw.ts
+import { verboose } from "./renderer";
+
 import { Atom, Bond } from "./types";
 import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
@@ -8,6 +10,8 @@ export interface DrawOptions {
     selectedAtomId: number | null;
     dragStartAtom: Atom | null;
     mousePos: { x: number, y: number };
+    lassoPath?: {x: number, y: number}[]; 
+    selectedAtomIds?: Set<number>;        
 }
 
 function getNeighborCoords(
@@ -56,6 +60,7 @@ export function drawScene(
     bonds: Bond[],
     options: DrawOptions
 ) {
+    if (verboose) {console.log("drawScene gestartet");}
     ctx.clearRect(0, 0, width, height);
 
     // --- BINDUNGEN ---
@@ -159,4 +164,58 @@ export function drawScene(
         ctx.stroke();
         ctx.setLineDash([]);
     }
+    if (options.selectedAtomIds && options.selectedAtomIds.size > 0) {
+        ctx.save(); // Zustand sichern
+        ctx.strokeStyle = "#0088ff"; // Helles Blau
+        ctx.lineWidth = 3;
+        
+        for (const atom of atoms) {
+            if (options.selectedAtomIds.has(atom.id)) {
+                ctx.beginPath();
+                ctx.arc(atom.x, atom.y, 16, 0, Math.PI * 2); // Etwas größer als das Atom
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    // --- LASSO PFAD ZEICHNEN ---
+    if (options.lassoPath && options.lassoPath.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(options.lassoPath[0].x, options.lassoPath[0].y);
+        for (let i = 1; i < options.lassoPath.length; i++) {
+            ctx.lineTo(options.lassoPath[i].x, options.lassoPath[i].y);
+        }
+        // Pfad schließen für Füllung
+        ctx.closePath();
+        
+        // Füllung (transparent blau)
+        ctx.fillStyle = "rgba(0, 136, 255, 0.1)"; 
+        ctx.fill();
+        
+        // Rand (blau gestrichelt)
+        ctx.strokeStyle = "rgba(0, 136, 255, 0.8)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]); // Gestrichelt
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    // --- LASSO ---
+    if (options.lassoPath && options.lassoPath.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(options.lassoPath[0].x, options.lassoPath[0].y);
+        for (let i = 1; i < options.lassoPath.length; i++) {
+            ctx.lineTo(options.lassoPath[i].x, options.lassoPath[i].y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "rgba(0, 120, 255, 0.1)"; // Transparentes Blau
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0, 120, 255, 0.5)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    } 
 }

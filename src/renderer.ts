@@ -1,14 +1,21 @@
+export let verboose = true;
+if (verboose) {console.log("🚀 Renderer.ts wird geladen...")} ;
+
 import { state } from "./state";
 import { Atom, Bond } from "./types";
-import { findAtomNearPosition, getBondAtCoords } from "./geometry";
+import { findAtomNearPosition, getBondAtCoords, isPointInPolygon } from "./geometry";
 import { applyAutoLayout, calculateNewAtomPosition } from "./chemistry";
 import { drawScene } from "./draw";
 import { periodicTable } from "./pse";
 import { elementLayout } from "./pse_layout";
 
 // Lokale UI-Variablen (Dinge, die NICHT im History-Undo gespeichert werden müssen)
-let editMode: "draw" | "move" | "erase" = "draw";
+let editMode: "draw" | "move" | "erase" | "select" = "draw";
 let showValenceWarnings = true;
+
+// Für das Auswahl-Tool
+let lassoPath: {x: number, y: number}[] = []; 
+let isDraggingSelection = false; 
 
 // Maus-Status
 let dragStartAtom: Atom | null = null;
@@ -22,13 +29,15 @@ let movingAtom: Atom | null = null;
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
-// Wrapper fürs Zeichnen
 function render() {
+    if (verboose) {console.log("🎨 Render wird aufgerufen. Atome:", state.getAtoms().length);}
     drawScene(ctx, canvas.width, canvas.height, state.getAtoms(), state.getBonds(), {
         showValenceWarnings,
         selectedAtomId: null, 
         dragStartAtom,
-        mousePos: { x: currentMouseX, y: currentMouseY }
+        mousePos: { x: currentMouseX, y: currentMouseY },
+        lassoPath: lassoPath,
+        selectedAtomIds: state.getSelectedAtomIds()
     });
 }
 
@@ -50,10 +59,11 @@ canvas.addEventListener('mousedown', (e) => {
     const atoms = state.getAtoms();
     const bonds = state.getBonds();
 
+    // 1. RADIERER MODUS
     if (editMode === "erase") {
         const atomHit = findAtomNearPosition(x, y, atoms, 20);
         if (atomHit) {
-            state.saveState(); // Sichern
+            state.saveState(); 
             const newAtoms = atoms.filter(a => a.id !== atomHit.id);
             const newBonds = bonds.filter(b => b.id1 !== atomHit.id && b.id2 !== atomHit.id);
             state.setAtoms(newAtoms);
@@ -63,20 +73,42 @@ canvas.addEventListener('mousedown', (e) => {
         }
         const bondHit = getBondAtCoords(x, y, bonds, atoms);
         if (bondHit) {
-            state.saveState(); // Sichern
+            state.saveState(); 
             state.setBonds(bonds.filter(b => b !== bondHit));
             render();
         }
-
+    
+    // 2. VERSCHIEBE MODUS (Einzeln)
     } else if (editMode === "move") {
         movingAtom = findAtomNearPosition(x, y, atoms, 20);
 
+    // 3. SELEKTIONS MODUS (Lasso) -> NEU
+    } else if (editMode === "select") {
+        const atomHit = findAtomNearPosition(x, y, atoms, 20);
+
+        // A) Klick auf ein Atom, das SCHON ausgewählt ist -> Auswahl verschieben
+        if (atomHit && state.isSelected(atomHit.id)) {
+            isDraggingSelection = true;
+            dragStartX = x;
+            dragStartY = y;
+            state.saveState(); // Zustand vor dem Verschieben sichern
+        } 
+        // B) Klick ins Leere oder auf ein nicht-markiertes -> Neues Lasso starten
+        else {
+            state.clearSelection(); // Alte Auswahl weg
+            lassoPath = [{x, y}];   // Pfad starten
+            render();
+        }
+
+    // 4. ZEICHEN MODUS (Der Standard-Fall "else")
+    // WICHTIG: Wenn dieser Block fehlt, passiert beim Klicken nichts!
     } else {
         dragStartX = x;
         dragStartY = y;
         dragStartAtom = findAtomNearPosition(x, y, atoms, 20);
     }
 });
+
 
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -87,38 +119,108 @@ canvas.addEventListener('mousemove', (e) => {
         movingAtom.x = currentMouseX;
         movingAtom.y = currentMouseY;
         render();
-    } else {
-        render();
+
+    } else if (editMode === "select") {
+        if (isDraggingSelection) {
+        // --- GRUPPE VERSCHIEBEN ---
+            const dx = currentMouseX - dragStartX;
+            const dy = currentMouseY - dragStartY;
+
+        // Wir bewegen ALLE ausgewählten Atome
+            const atoms = state.getAtoms();
+            const selectedIds = state.getSelectedAtomIds();
+        
+            atoms.forEach(atom => {
+                if (selectedIds.has(atom.id)) {
+                    atom.x += dx;
+                    atom.y += dy;
+                }
+            });
+
+            dragStartX = currentMouseX;
+            dragStartY = currentMouseY;
+            render();
+
+    } else if (lassoPath.length > 0) {
+    // --- LASSO MALEN (Optimiert) ---
+    
+        const lastPoint = lassoPath[lassoPath.length - 1];
+    
+        const dx = currentMouseX - lastPoint.x;
+        const dy = currentMouseY - lastPoint.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist > 5) {
+            lassoPath.push({ x: currentMouseX, y: currentMouseY });
+            render(); // Jetzt wird viel seltener gerendert!
+        } else render();
     }
-});
+}});
 
 canvas.addEventListener('mouseup', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // 1. VERSCHIEBEN BEENDEN
     if (editMode === "move") {
-        if (movingAtom) state.saveState(); // Nach Verschieben speichern
+        if (movingAtom) state.saveState(); 
         movingAtom = null;
         return;
     }
 
+    // 2. SELEKTIEREN BEENDEN
+    if (editMode === "select") {
+        if (isDraggingSelection) {
+            console.log("✅ Verschieben beendet.");
+            isDraggingSelection = false;
+        } 
+        else if (lassoPath.length > 0) {
+            // Lasso auswerten
+            lassoPath.push({x: lassoPath[0].x, y: lassoPath[0].y}); // Schließen
+            
+            const atoms = state.getAtoms();
+            const newSelection: number[] = [];
+
+            // DEBUG: Mal schauen, wie viele Atome wir prüfen
+            console.log(`🔍 Prüfe Lasso auf ${atoms.length} Atome...`);
+
+            for (const atom of atoms) {
+                const inside = isPointInPolygon({x: atom.x, y: atom.y}, lassoPath);
+                if (inside) {
+                    newSelection.push(atom.id);
+                }
+            }
+
+            console.log(`🎯 Ergebnis: ${newSelection.length} Atome im Lasso gefunden.`);
+
+            state.selectAtoms(newSelection);
+            lassoPath = []; 
+            render();
+        }
+        return; 
+    }
+
+    // 3. RADIERER (Macht nix bei MouseUp)
     if (editMode === "erase") return;
 
-    // --- ZEICHEN LOGIK ---
+
+    // --- 4. ZEICHEN MODUS (Hier werden Atome erstellt!) ---
+    
     const atoms = state.getAtoms();
     const bonds = state.getBonds();
     const distance = Math.sqrt((x - dragStartX)**2 + (y - dragStartY)**2);
     const wasDragging = distance > 10;
     
-    // WICHTIG: Hier holen wir das Element JETZT aus dem State!
+    // Aktuelles Element holen (z.B. "C")
     const currentEl = state.getCurrentElement(); 
 
     if (dragStartAtom) {
+        // Wir haben auf einem Atom gestartet (Ziehen einer Bindung)
         const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
 
         if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
-            // A) Verbinden
+            // A) Verbindung zu existierendem Atom
             const exists = bonds.some(b => 
                 (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) || 
                 (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
@@ -128,30 +230,22 @@ canvas.addEventListener('mouseup', (e) => {
                 state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: 1 });
             }
         } else {
-            // B) Ins Leere gezogen -> Neues Atom + Bindung
+            // B) Ziehen ins Leere -> Neues Atom + Bindung
             if (wasDragging) {
                 state.saveState();
                 const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
                 state.addAtom(newAtom);
                 state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: 1 });
             } else {
-                // C) Klick -> Skelett-Modus
+                // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
                 const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms);
-                const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 20, dragStartAtom.id);
+                
+                // Kollisions-Check: Landen wir auf einem existierenden Atom?
+                const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); // Radius etwas kleiner
                 
                 if (neighbor) {
-                    // Ring schließen
-                    // Prüfen ob Bindung schon existiert
-                    const exists = bonds.some(b => 
-                        (b.id1 === dragStartAtom!.id && b.id2 === neighbor.id) || 
-                        (b.id1 === neighbor.id && b.id2 === dragStartAtom!.id)
-                    );
-                    if (!exists) {
-                        state.saveState();
-                        state.addBond({ id1: dragStartAtom.id, id2: neighbor.id, type: 1 });
-                    }
+                   // Ring-Schluss Logik wäre hier, lassen wir simpel
                 } else {
-                    // Neues Atom anbauen
                     state.saveState();
                     const newAtom: Atom = { id: state.getNextId(), element: currentEl, x: pos.x, y: pos.y };
                     state.addAtom(newAtom);
@@ -159,15 +253,18 @@ canvas.addEventListener('mouseup', (e) => {
                 }
             }
         }
-        dragStartAtom = null;
+        dragStartAtom = null; // Reset
     } else {
-        // Start im Leeren
+        // Wir haben im Leeren gestartet (Klick auf Hintergrund)
+        
         const clickedBond = getBondAtCoords(x, y, bonds, atoms);
+        
         if (clickedBond && !wasDragging) {
+            // Klick auf Bindung -> Typ ändern
             state.saveState();
-            clickedBond.type = (clickedBond.type % 3) + 1; // 1->2->3->1
+            clickedBond.type = (clickedBond.type % 3) + 1; 
         } else if (!wasDragging && !clickedBond) {
-            // Freies Atom
+            // Klick ins Leere -> FREIES ATOM ERSTELLEN
             state.saveState();
             const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
             state.addAtom(newAtom);
@@ -175,7 +272,6 @@ canvas.addEventListener('mouseup', (e) => {
     }
     render();
 });
-
 // --- UI BUTTONS ---
 
 // WICHTIG: Hier setzen wir den State, nicht mehr eine lokale Variable!
@@ -195,28 +291,59 @@ document.addEventListener('keydown', (event) => {
 });
 
 // Modus umschalten
-function setMode(mode: "draw" | "move" | "erase") {
+function setMode(mode: "draw" | "move" | "erase" | "select") {
     editMode = mode;
-    // Buttons reset
-    document.getElementById('btn-draw')!.style.backgroundColor = "";
-    document.getElementById('btn-move')!.style.backgroundColor = "";
-    document.getElementById('btn-erase')!.style.backgroundColor = "";
     
-    // Aktiven Button färben
-    document.getElementById(`btn-${mode}`)!.style.backgroundColor = "#ddd";
+    // 1. Alle Buttons resetten (Farbe entfernen)
+    // Wir packen die IDs in ein Array, damit wir nichts vergessen
+    const btnIds = ['btn-draw', 'btn-move', 'btn-erase', 'btn-select'];
     
-    // Cursor anpassen
-    if (mode === "erase") canvas.style.cursor = "not-allowed"; // oder url(...)
-    else if (mode === "move") canvas.style.cursor = "move";
-    else canvas.style.cursor = "crosshair";
+    btnIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.backgroundColor = "";
+    });
+    
+    // 2. Den aktiven Button färben
+    // Da wir die IDs schlau benannt haben (btn-draw, btn-select...), geht das dynamisch:
+    const activeBtn = document.getElementById(`btn-${mode}`);
+    if (activeBtn) activeBtn.style.backgroundColor = "#ddd"; // Aktiv-Farbe
+    
+    // 3. Cursor anpassen
+    if (mode === "erase") {
+        canvas.style.cursor = "not-allowed"; 
+    } else if (mode === "move") {
+        canvas.style.cursor = "move";
+    } else if (mode === "select") {
+        canvas.style.cursor = "default"; // Normaler Pfeil für Auswahl
+    } else {
+        canvas.style.cursor = "crosshair"; // Fadenkreuz fürs Zeichnen
+    }
 }
-
 document.getElementById('btn-draw')?.addEventListener('click', () => setMode("draw"));
 document.getElementById('btn-move')?.addEventListener('click', () => setMode("move"));
 document.getElementById('btn-erase')?.addEventListener('click', () => setMode("erase"));
 document.getElementById('btn-clean')?.addEventListener('click', () => {
     state.saveState();
-    applyAutoLayout(state.getAtoms(), state.getBonds());
+    
+    const allAtoms = state.getAtoms();
+    const allBonds = state.getBonds();
+    const selectedIds = state.getSelectedAtomIds();
+
+    if (selectedIds.size > 0) {
+        // --- A. NUR AUSWAHL AUFRÄUMEN ---
+        // Wir erstellen eine Liste, die NUR die markierten Atome enthält
+        const selectedAtoms = allAtoms.filter(a => selectedIds.has(a.id));
+        
+        // WICHTIG: Die Bindungen müssen wir trotzdem alle übergeben, 
+        // damit er weiß, wer mit wem verbunden ist.
+        // Der Algorithmus verschiebt aber nur die Atome, die im Array sind.
+        applyAutoLayout(selectedAtoms, allBonds);
+        
+    } else {
+        // --- B. ALLES AUFRÄUMEN (Standard) ---
+        applyAutoLayout(allAtoms, allBonds);
+    }
+    
     render();
 });
 document.getElementById('btn-warnings')?.addEventListener('click', () => {
@@ -233,6 +360,11 @@ document.getElementById('btn-warnings')?.addEventListener('click', () => {
         }
     }
     render();
+});
+document.getElementById('btn-select')?.addEventListener('click', () => {
+    setMode("select");
+    // Optional: Cursor ändern
+    canvas.style.cursor = "default";
 });
 
 const pseMenu = document.getElementById('pse-menu');
@@ -292,5 +424,6 @@ document.getElementById('btn-pse')?.addEventListener('click', () => {
 document.getElementById('btn-close-pse')?.addEventListener('click', () => {
     if (pseMenu) pseMenu.style.display = 'none';
 });
-// Start!
+
+initPSE();
 render();
