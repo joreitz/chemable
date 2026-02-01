@@ -132,3 +132,29 @@ export function isPointInPolygon(p: {x: number, y: number}, polygon: {x: number,
     
     return isInside;
 }
+
+export function rotatePoint(point: {x: number, y: number}, center: {x: number, y: number}, angle: number) {
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+
+    const xtemp = point.x - center.x;
+    const ytemp = point.y - center.y;
+
+    const rotatedX = cos * xtemp - sin * ytemp;
+    const rotatedY = sin * xtemp + cos * ytemp;
+
+    return { x: rotatedX + center.x, y: rotatedY + center.y };
+}
+
+export function centerOfPoints(points: {x: number, y: number}[]): {x: number, y: number} {
+    let xi = 0; let yi = 0;
+    for (const p of points) {
+        xi += p.x; yi += p.y;
+    }
+    return {x: xi / points.length, y: yi / points.length};
+}
+
+export function angleOfMouseMovement(start: {x: number, y: number}, center: {x: number, y: number}): number {
+    const angleStart = Math.atan2(start.y - center.y, start.x - center.x);
+    return angleStart;   
+}

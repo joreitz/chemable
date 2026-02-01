@@ -3,7 +3,7 @@ if (verboose) {console.log("🚀 Renderer.ts wird geladen...")} ;
 
 import { state } from "./state";
 import { Atom, Bond } from "./types";
-import { findAtomNearPosition, getBondAtCoords, isPointInPolygon } from "./geometry";
+import { findAtomNearPosition, getBondAtCoords, isPointInPolygon, rotatePoint, centerOfPoints, angleOfMouseMovement } from "./geometry";
 import { applyAutoLayout, calculateNewAtomPosition } from "./chemistry";
 import { drawScene } from "./draw";
 import { periodicTable } from "./pse";
@@ -16,6 +16,9 @@ let showValenceWarnings = true;
 // Für das Auswahl-Tool
 let lassoPath: {x: number, y: number}[] = []; 
 let isDraggingSelection = false; 
+let isRotating = false;
+let rotationcenter: {x: number, y: number};
+let initialAtomPosition = new Map<number, { x: number, y: number }>();
 
 // Maus-Status
 let dragStartAtom: Atom | null = null;
@@ -51,6 +54,10 @@ function performUndo() {
 
 // --- EVENT LISTENER (MAUS) ---
 
+canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+});
+
 canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -81,7 +88,19 @@ canvas.addEventListener('mousedown', (e) => {
     // 2. VERSCHIEBE MODUS (Einzeln)
     } else if (editMode === "move") {
         movingAtom = findAtomNearPosition(x, y, atoms, 20);
+    
+    } else if (e.button ===2) {
+        if (state.getSelectedAtomIds().size >0) {
+            const selectedIDs = state.getSelectedAtomIds();
+            const allAtoms = state.getAtoms();
+            const selectedAtoms = allAtoms.filter(atom => selectedIDs.has(atom.id));
 
+            selectedAtoms.forEach(atom => {
+                initialAtomPosition.set(atom.id, {x: atom.x, y: atom.y});
+            })
+            isRotating = true;
+            
+        }
     // 3. SELEKTIONS MODUS (Lasso) -> NEU
     } else if (editMode === "select") {
         const atomHit = findAtomNearPosition(x, y, atoms, 20);
@@ -126,7 +145,6 @@ canvas.addEventListener('mousemove', (e) => {
             const dx = currentMouseX - dragStartX;
             const dy = currentMouseY - dragStartY;
 
-        // Wir bewegen ALLE ausgewählten Atome
             const atoms = state.getAtoms();
             const selectedIds = state.getSelectedAtomIds();
         
@@ -142,7 +160,7 @@ canvas.addEventListener('mousemove', (e) => {
             render();
 
     } else if (lassoPath.length > 0) {
-    // --- LASSO MALEN (Optimiert) ---
+    // --- LASSO MALEN ---
     
         const lastPoint = lassoPath[lassoPath.length - 1];
     
@@ -154,6 +172,34 @@ canvas.addEventListener('mousemove', (e) => {
             lassoPath.push({ x: currentMouseX, y: currentMouseY });
             render(); // Jetzt wird viel seltener gerendert!
         } else render();
+
+    } else if (isRotating) {
+
+        state.saveState();
+        const atoms = state.getAtoms();
+        const selectedIDs = state.getSelectedAtomIds();
+        const selectedAtoms = atoms.filter(atom => selectedIDs.has(atom.id));
+        rotationcenter = centerOfPoints(selectedAtoms.map(a => ({x: a.x, y: a.y})));
+        const angle = angleOfMouseMovement(
+            {x: currentMouseX, y: currentMouseY}, 
+            rotationcenter
+        ) - angleOfMouseMovement(
+            {x: dragStartX, y: dragStartY}, 
+            rotationcenter
+        );
+        dragStartX = currentMouseX;
+        dragStartY = currentMouseY;
+
+        selectedAtoms.forEach(atom => {
+            const initialPos = selectedAtoms.find(pos => pos.id === atom.id);
+            if (initialPos) {
+                const rotated = rotatePoint(initialPos, rotationcenter, angle);
+                atom.x = rotated.x;
+                atom.y = rotated.y;
+            }
+            
+        });
+        render();
     }
 }});
 
@@ -204,6 +250,11 @@ canvas.addEventListener('mouseup', (e) => {
     // 3. RADIERER (Macht nix bei MouseUp)
     if (editMode === "erase") return;
 
+    if (isRotating) {
+        isRotating = false;
+        initialAtomPosition.clear();
+        return;
+    }
 
     // --- 4. ZEICHEN MODUS (Hier werden Atome erstellt!) ---
     
@@ -274,7 +325,7 @@ canvas.addEventListener('mouseup', (e) => {
 });
 // --- UI BUTTONS ---
 
-// WICHTIG: Hier setzen wir den State, nicht mehr eine lokale Variable!
+// Hier wird ein state gesetzt, also speichern wir den alten Zustand
 
 document.getElementById('btn-clear')?.addEventListener('click', () => { 
     state.clear(); 
