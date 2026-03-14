@@ -9,7 +9,7 @@ export interface ChemableContext {
     drawOverlay: (data: any) => void; 
 }
 
-// Das muss jedes Plugin implementieren
+// Das muss jedes Plugin implementieren !!
 export interface ChemablePlugin {
     id: string;
     name: string;
@@ -18,9 +18,9 @@ export interface ChemablePlugin {
     // Wird beim Start aufgerufen
     onLoad: (context: ChemableContext) => void;
     
-    // Wird aufgerufen, wenn der User "Berechnen" klickt
+    // Buttin Press of plugin-specific action
     execute?: () => Promise<void>; 
     
-    // Aufräumen
+    // Cleanup beim Deaktivieren des Plugins
     onUnload: () => void;
 }

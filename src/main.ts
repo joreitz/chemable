@@ -25,7 +25,7 @@ app.whenReady().then(() => {
   });
 });
 
-// Beenden, wenn alle Fenster geschlossen sind (außer auf Mac)
+// Beenden, wenn alle Fenster geschlossen sind (außer auf Mac!?)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

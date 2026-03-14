@@ -3,6 +3,10 @@ export interface Atom {
     element: string;
     x: number;
     y: number;
+    charge?: number;
+    radical?: boolean;
+    customLabel?: string;
+    autoFlip?: boolean;   
 }
 
 export interface Bond {

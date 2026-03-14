@@ -5,42 +5,81 @@ import { getAngle } from "./geometry";
 
 // --- HELPER ---
 const SUBSCRIPT_NUMBERS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+const SUPERSCRIPT_NUMBERS = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'];
 
 function toSubscript(num: number): string {
     return num.toString().split('').map(d => SUBSCRIPT_NUMBERS[parseInt(d)] || d).join('');
 }
 
+function formatCharge(charge?: number): string {
+    if (!charge || charge === 0) return "";
+    if (charge === 1) return "⁺";
+    if (charge === -1) return "⁻";
+    // Für Werte wie +2 oder -2:
+    return Math.abs(charge).toString().split('').map(d => SUPERSCRIPT_NUMBERS[parseInt(d)] || d).join('') + (charge > 0 ? "⁺" : "⁻");
+}
+
+function getAdjustedValence(element: string, charge: number, baseValence: number): number {
+    if (!charge) return baseValence;
+    // Gruppe 14 (C, Si): Ladung reduziert Valenz (C+ = 3 Bindungen, C- = 3 Bindungen + freies Elektronenpaar)
+    if (["C", "Si"].includes(element)) return Math.max(0, baseValence - Math.abs(charge));
+    // Gruppen 15, 16, 17: + erhöht Bindigkeit (N+ = 4, O+ = 3), - senkt Bindigkeit (N- = 2, O- = 1)
+    if (["N", "P", "O", "S", "F", "Cl", "Br", "I"].includes(element)) return Math.max(0, baseValence + charge);
+    
+    return baseValence;
+}
+
 export function getImplicitHydrogens(atom: Atom, bonds: Bond[]): number {
     const data = periodicTable[atom.element];
     if (!data) return 0;
-    const maxValence = Math.max(...data.valency);
+    
+    let targetValence = Math.max(...data.valency);
+    targetValence = getAdjustedValence(atom.element, atom.charge || 0, targetValence);
+    
+    // Ein Radikal (ungepaartes Elektron) besetzt ebenfalls einen Valenzplatz!
+    if (atom.radical) targetValence -= 1;
+
     let currentBonds = 0;
     for (const bond of bonds) {
         if (bond.id1 === atom.id || bond.id2 === atom.id) currentBonds += bond.type;
     }
-    return Math.max(0, maxValence - currentBonds);
+    return Math.max(0, targetValence - currentBonds);
 }
 
 export function getAtomLabel(atom: Atom, bonds: Bond[]): string {
     const hCount = getImplicitHydrogens(atom, bonds);
+    const chargeStr = formatCharge(atom.charge);
+    
     if (atom.element === "C") {
-        if (hCount === 4) return "CH" + toSubscript(4);
-        return ""; 
+        // C-Atome, die eine Ladung oder Radikal haben, MÜSSEN im Skelett sichtbar sein!
+        if (atom.charge || atom.radical) {
+            if (hCount === 0) return "C" + chargeStr;
+            if (hCount === 1) return "CH" + chargeStr;
+            return "CH" + toSubscript(hCount) + chargeStr;
+        } else {
+            if (hCount === 4) return "CH" + toSubscript(4);
+            return ""; // Skelett-Kohlenstoff unsichtbar
+        }
     }
-    if (hCount === 0) return atom.element;
-    if (hCount === 1) return atom.element + "H";
-    return atom.element + "H" + toSubscript(hCount);
+    
+    if (hCount === 0) return atom.element + chargeStr;
+    if (hCount === 1) return atom.element + "H" + chargeStr;
+    return atom.element + "H" + toSubscript(hCount) + chargeStr;
 }
 
 export function hasValenceError(atom: Atom, bonds: Bond[]): boolean {
     const data = periodicTable[atom.element];
     if (!data) return false;
-    const maxValence = Math.max(...data.valency);
+    
+    let targetValence = Math.max(...data.valency);
+    targetValence = getAdjustedValence(atom.element, atom.charge || 0, targetValence);
+    if (atom.radical) targetValence -= 1;
+
     let currentBonds = 0;
     for (const bond of bonds) {
         if (bond.id1 === atom.id || bond.id2 === atom.id) currentBonds += bond.type;
     }
-    return currentBonds > maxValence;
+    return currentBonds > targetValence;
 }
 
 export function calculateNewAtomPosition(clickedAtom: Atom, bonds: Bond[], atoms: Atom[], radius: number = 60): { x: number, y: number } {

@@ -48,33 +48,56 @@
     <h1>Chemie Editor Alpha</h1>
     
     <div id="toolbar">
-      <button id="btn-draw" style="font-weight:bold; background-color:#ddd;">✏️ Zeichnen</button>
-      <button id="btn-move">Move</button>
-      <button id="btn-erase">Erase</button>
-      <button id="btn-select">Lasso</button>
-      <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-      
-      <button id="btn-pse">Choose element...</button>
-      <span id="current-element-display" style="font-weight: bold; margin-left: 5px;">[ C ]</span>
+  <button id="btn-draw" style="font-weight:bold; background-color:#ddd;">✏️ Zeichnen</button>
+  <button id="btn-move">Move</button>
+  <button id="btn-erase">Erase</button>
+  <button id="btn-select">Lasso</button>
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  
+  <button id="btn-pse">Choose element...</button>
+  <span id="current-element-display" style="font-weight: bold; margin-left: 5px;">[ C ]</span>
 
-      <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-      <button id="btn-undo">Undo</button>
-      <button id="btn-clear">Clear</button>
-      <button id="btn-clean">Clean-up</button>
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  <button id="btn-undo">Undo</button>
+  <button id="btn-clear">Clear</button>
+  <button id="btn-clean">Clean-up</button>
 
-      <button id="btn-warnings" style="background-color: #ffcccc;">⚠️ Warnings: On</button>
-    </div>
+  <button id="btn-warnings" style="background-color: #ffcccc;">⚠️ Warnings: On</button>
+  
+  <button id="btn-grid" style="background-color: #eee;">🔲 Grid: Off</button>
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  <button id="btn-save" style="background-color: #e2e3e5;">💾 Speichern (.chema)</button>
+  <button id="btn-load" style="background-color: #e2e3e5;">📂 Öffnen</button>
+  <input type="file" id="file-load" style="display: none;" accept=".chem,.svg" />
 
-    <div id="pse-menu">
-        <div id="pse-grid">
-            </div>
-        <button id="btn-close-pse" style="margin-top: 10px; width: 100%;">Close</button>
-    </div>
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  <label for="bond-length-slider" style="font-size: 13px;">Länge: <span id="bond-length-val">60</span></label>
+  <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 80px; vertical-align: middle;">
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  <button id="btn-export-svg" style="background-color: #d4edda; font-weight: bold;">💾 SVG</button>
+  <button id="btn-export-pdf" style="background-color: #f8d7da; font-weight: bold;">📄 PDF</button>
+</div> 
+
+<div id="pse-menu">
+  <div id="pse-grid">
+  </div>
+  <button id="btn-close-pse" style="margin-top: 10px; width: 100%;">Close</button>
+</div>
 
     <canvas id="chemBoard" width="800" height="600" style="border:1px solid #ccc; cursor: crosshair;"></canvas>
     
     <script>
       require('./dist/renderer.js');
     </script>
-  </body>
+
+  <div id="custom-text-editor" style="display:none; position:absolute; z-index:1000; background:white; border:2px solid #0088ff; border-radius:4px; padding:8px; box-shadow:0 4px 10px rgba(0,0,0,0.2); font-family: sans-serif;">
+        <input type="text" id="custom-text-input" placeholder="z.B. OPO_3^(2-)" style="width:150px; outline:none; border:1px solid #ccc; padding:4px; margin-bottom: 5px;">
+        <br>
+        <label style="font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="custom-text-flip"> Zur Bindung ausrichten
+        </label>
+        <br>
+        <button id="custom-text-save" style="cursor:pointer; margin-top: 5px; width: 100%; background: #0088ff; color: white; border: none; padding: 4px;">OK</button>
+    </div>
+</body>
 </html>
