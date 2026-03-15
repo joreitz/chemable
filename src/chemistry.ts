@@ -35,13 +35,15 @@ export function getImplicitHydrogens(atom: Atom, bonds: Bond[]): number {
     
     let targetValence = Math.max(...data.valency);
     targetValence = getAdjustedValence(atom.element, atom.charge || 0, targetValence);
-    
-    // Ein Radikal (ungepaartes Elektron) besetzt ebenfalls einen Valenzplatz!
     if (atom.radical) targetValence -= 1;
 
     let currentBonds = 0;
     for (const bond of bonds) {
-        if (bond.id1 === atom.id || bond.id2 === atom.id) currentBonds += bond.type;
+        if (bond.id1 === atom.id || bond.id2 === atom.id) {
+            // FIX: Keile (5) und Dashes (6) zählen chemisch als 1 Einfachbindung!
+            if (bond.type === 5 || bond.type === 6) currentBonds += 1;
+            else if (bond.type !== 4) currentBonds += bond.type;
+        }
     }
     return Math.max(0, targetValence - currentBonds);
 }
@@ -81,7 +83,11 @@ export function hasValenceError(atom: Atom, bonds: Bond[]): boolean {
 
     let currentBonds = 0;
     for (const bond of bonds) {
-        if (bond.id1 === atom.id || bond.id2 === atom.id) currentBonds += bond.type;
+        if (bond.id1 === atom.id || bond.id2 === atom.id) {
+            // FIX: Auch hier! Keile und Dashes sind Einfachbindungen!
+            if (bond.type === 5 || bond.type === 6) currentBonds += 1;
+            else if (bond.type !== 4) currentBonds += bond.type;
+        }
     }
     return currentBonds > targetValence;
 }

@@ -52,7 +52,11 @@
                 <button id="btn-grid">🔲 Raster: Aus</button>
             </div>
         </div>
-
+        <div class="dropdown">
+            <button class="menu-btn">🧩 Plugins</button>
+            <div class="dropdown-content" id="plugin-dropdown-content">
+                </div>
+        </div>
         <div style="margin-left: auto; display: flex; align-items: center; font-size: 13px;">
             <label for="bond-length-slider">Länge: <span id="bond-length-val">60</span></label>
             <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 70px; margin: 0 10px 0 5px;">
@@ -113,7 +117,14 @@
         <button id="hk-btn-save" style="padding: 8px; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold; width: 100%; cursor: pointer;">Speichern</button>
         <button id="hk-btn-close" style="padding: 8px; margin-top: 5px; background: #ccc; border: none; border-radius: 4px; width: 100%; cursor: pointer;">Abbrechen</button>
     </div>
-
+    <div id="pse-menu" style="display:none; position:absolute; top:80px; right:20px; background:white; border:2px solid #333; border-radius:8px; padding:15px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; font-family: sans-serif;">
+        <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
+            Element wählen
+            <button id="btn-close-pse" style="cursor:pointer; background:none; border:none; font-size:16px; font-weight:bold;">✖</button>
+        </h3>
+        <div id="pse-grid" style="display:grid; grid-template-columns:repeat(18, 30px); grid-template-rows:repeat(7, 30px); gap:2px; font-size: 12px; font-weight: bold; text-align: center; line-height: 30px; cursor: pointer;">
+            </div>
+    </div>
     <script>
       require('./dist/renderer.js');
     </script>

@@ -1,6 +1,12 @@
 export let verboose = true;
 if (verboose) {console.log("🚀 Renderer.ts wird geladen...")} ;
 
+import { ChemablePlugin, ChemableContext } from "./plugin-api";
+import { registerPlugin } from "./plugin-manager";
+import { analyzerPlugin } from "./plugins/analyzer";
+import { ehtPlugin } from "./plugins/eht";
+registerPlugin(analyzerPlugin);
+
 import { state } from "./state";
 import { Atom, Bond } from "./types";
 import { findAtomNearPosition, getBondAtCoords, isPointInPolygon, rotatePoint, centerOfPoints, angleOfMouseMovement } from "./geometry";
@@ -331,12 +337,12 @@ canvas.addEventListener('mouseup', (e) => {
     let x = e.clientX - rect.left - panX;
     let y = e.clientY - rect.top - panY;
     
-    if (editMode === "draw" && dragStartAtom && !e.ctrlKey) {
+    // Snapping-Vorschau beim Loslassen anwenden
+    if ((editMode === "draw" || editMode === "arrow") && dragStartAtom && !e.ctrlKey) {
         const dx = x - dragStartAtom.x;
         const dy = y - dragStartAtom.y;
         const rawDist = Math.sqrt(dx*dx + dy*dy);
         
-        // Auch hier: Nur wenn wir wirklich ziehen!
         if (rawDist > 10) {
             const standardLength = currentBondLength;
             const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 6)) * (Math.PI / 6);
@@ -345,6 +351,7 @@ canvas.addEventListener('mouseup', (e) => {
             y = dragStartAtom.y + Math.sin(angle) * standardLength;
         }
     }
+
     // 1. VERSCHIEBEN BEENDEN
     if (editMode === "move") {
         if (movingAtom) state.saveState(); 
@@ -355,28 +362,17 @@ canvas.addEventListener('mouseup', (e) => {
     // 2. SELEKTIEREN BEENDEN
     if (editMode === "select") {
         if (isDraggingSelection) {
-            console.log("✅ Verschieben beendet.");
             isDraggingSelection = false;
         } 
         else if (lassoPath.length > 0) {
-            // Lasso auswerten
-            lassoPath.push({x: lassoPath[0].x, y: lassoPath[0].y}); // Schließen
-            
+            lassoPath.push({x: lassoPath[0].x, y: lassoPath[0].y}); 
             const atoms = state.getAtoms();
             const newSelection: number[] = [];
-
-            // DEBUG: Mal schauen, wie viele Atome wir prüfen
-            console.log(`🔍 Prüfe Lasso auf ${atoms.length} Atome...`);
-
             for (const atom of atoms) {
-                const inside = isPointInPolygon({x: atom.x, y: atom.y}, lassoPath);
-                if (inside) {
+                if (isPointInPolygon({x: atom.x, y: atom.y}, lassoPath)) {
                     newSelection.push(atom.id);
                 }
             }
-
-            console.log(`Ergebnis: ${newSelection.length} Atome im Lasso gefunden.`);
-
             state.selectAtoms(newSelection);
             lassoPath = []; 
             render();
@@ -387,76 +383,91 @@ canvas.addEventListener('mouseup', (e) => {
     // 3. RADIERER (Macht nix bei MouseUp)
     if (editMode === "erase") return;
 
+    // ROTATION BEENDEN
     if (isRotating) {
         isRotating = false;
         initialAtomPosition.clear();
         return;
     }
 
-    //  4. ZEICHEN MODUS  
-    
-    const atoms = state.getAtoms();
-    const bonds = state.getBonds();
-    const distance = Math.sqrt((x - dragStartX)**2 + (y - dragStartY)**2);
-    const wasDragging = distance > 10;
-    
-    // Aktuelles Element holen (z.B. "C")
-    const currentEl = state.getCurrentElement(); 
+    // --- 4. ZEICHEN MODUS & PFEILE ---
+    if (editMode === "draw" || editMode === "arrow") {
+        const atoms = state.getAtoms();
+        const bonds = state.getBonds();
+        const distance = Math.sqrt((x - dragStartX)**2 + (y - dragStartY)**2);
+        const wasDragging = distance > 10;
+        const currentEl = state.getCurrentElement(); 
 
-    if (dragStartAtom) {
-        // Wir haben auf einem Atom gestartet (Ziehen einer Bindung)
-        const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
-
-        if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
-            // A) Verbindung zu existierendem Atom
-            const exists = bonds.some(b => 
-                (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) || 
-                (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
-            );
-            if (!exists) {
-                state.saveState();
-                // HIER currentBondType einsetzen!
-                state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: currentBondType });
+        if (dragStartAtom) {
+            // Sonderfall: Reaktionspfeil
+            if (editMode === "arrow") {
+                if (wasDragging) {
+                    state.saveState();
+                    const startAtom: Atom = { id: state.getNextId(), element: "DUMMY", x: dragStartAtom.x, y: dragStartAtom.y };
+                    state.addAtom(startAtom);
+                    const endAtom: Atom = { id: state.getNextId(), element: "DUMMY", x, y };
+                    state.addAtom(endAtom);
+                    state.addBond({ id1: startAtom.id, id2: endAtom.id, type: 4 });
+                }
+                dragStartAtom = null;
+                render();
+                return;
             }
-        } else {
-            // B) Ziehen ins Leere -> Neues Atom + Bindung
-            if (wasDragging) {
+
+            // Normales Zeichnen (Bindung ziehen)
+            const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
+
+            if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
+                // A) Verbindung zu existierendem Atom
+                const exists = bonds.some(b => 
+                    (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) || 
+                    (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
+                );
+                if (!exists) {
+                    state.saveState();
+                    state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: currentBondType });
+                }
+            } else {
+                // B) Ziehen ins Leere -> Neues Atom + Bindung
+                if (wasDragging) {
+                    state.saveState();
+                    const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
+                    state.addAtom(newAtom);
+                    state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
+                } else {
+                    // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
+                    const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms);
+                    const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); 
+                    
+                    if (!neighbor) {
+                        state.saveState();
+                        const newAtom: Atom = { id: state.getNextId(), element: currentEl, x: pos.x, y: pos.y };
+                        state.addAtom(newAtom);
+                        state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
+                    }
+                }
+            }
+            dragStartAtom = null; // Reset
+        } else if (editMode === "draw") {
+            // Wir haben im Leeren gestartet (Klick auf Hintergrund oder Klick auf Bindung)
+            const clickedBond = getBondAtCoords(x, y, bonds, atoms);
+            
+            if (clickedBond && !wasDragging) {
+                // Klick auf Bindung
+                state.saveState();
+                if (currentBondType === 1) {
+                    // Wenn normaler Stift: Typ durchwechseln (Einfach, Zweifach, Dreifach)
+                    clickedBond.type = (clickedBond.type % 3) + 1; 
+                } else {
+                    // Wenn Keil/Dash-Stift: Bindung direkt in Keil/Dash umwandeln!
+                    clickedBond.type = currentBondType;
+                }
+            } else if (!wasDragging && !clickedBond) {
+                // Klick ins Leere -> FREIES ATOM ERSTELLEN
                 state.saveState();
                 const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
                 state.addAtom(newAtom);
-                // HIER currentBondType einsetzen!
-                state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
-            } else {
-                // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
-                const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms);
-                
-                // Kollisions-Check: Landen wir auf einem existierenden Atom?
-                const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); 
-                
-                if (!neighbor) {
-                    state.saveState();
-                    const newAtom: Atom = { id: state.getNextId(), element: currentEl, x: pos.x, y: pos.y };
-                    state.addAtom(newAtom);
-                    // HIER currentBondType einsetzen!
-                    state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
-                }
             }
-        }
-        dragStartAtom = null; // Reset
-    } else {
-        // Wir haben im Leeren gestartet (Klick auf Hintergrund)
-        
-        const clickedBond = getBondAtCoords(x, y, bonds, atoms);
-        
-        if (clickedBond && !wasDragging) {
-            // Klick auf Bindung -> Typ ändern
-            state.saveState();
-            clickedBond.type = (clickedBond.type % 3) + 1; 
-        } else if (!wasDragging && !clickedBond) {
-            // Klick ins Leere -> FREIES ATOM ERSTELLEN
-            state.saveState();
-            const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
-            state.addAtom(newAtom);
         }
     }
     render();

@@ -127,7 +127,7 @@ export function drawScene(
     // --- BINDUNGEN ---
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#000000";
-    ctx.setLineDash([]); // Fixt die grauen Bindungen!
+    ctx.setLineDash([]); 
 
     for (const bond of bonds) {
         const a1 = atoms.find(a => a.id === bond.id1);
@@ -153,6 +153,7 @@ export function drawScene(
         if (bond.type === 1) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
+            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
         } else if (bond.type === 2) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -163,6 +164,7 @@ export function drawScene(
             const padding = 3; 
             ctx.moveTo(a1.x + shiftX + ux * padding, a1.y + shiftY + uy * padding);
             ctx.lineTo(a2.x + shiftX - ux * padding, a2.y + shiftY - uy * padding);
+            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
         } else if (bond.type === 3) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -171,14 +173,12 @@ export function drawScene(
             ctx.lineTo(a2.x + nx * o, a2.y + ny * o);
             ctx.moveTo(a1.x - nx * o, a1.y - ny * o);
             ctx.lineTo(a2.x - nx * o, a2.y - ny * o);
+            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
         } else if (bond.type === 4) {
-            // Zeichne den geraden Strich
-            ctx.beginPath();
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             ctx.stroke();
 
-            // Zeichne die Pfeilspitze
             const headlen = 12;
             const angle = Math.atan2(dy, dx);
             ctx.beginPath();
@@ -187,58 +187,38 @@ export function drawScene(
             ctx.moveTo(a2.x, a2.y);
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
-            continue;
         } else if (bond.type === 5) {
             // Voll-Keil (Wedge)
-            const halfWidth = 5; // Wie breit der Keil am Ende wird
+            const halfWidth = 5; 
             ctx.fillStyle = "#000000";
-            ctx.beginPath();
-            ctx.moveTo(a1.x, a1.y); // Startpunkt (spitz)
-            ctx.lineTo(a2.x + nx * halfWidth, a2.y + ny * halfWidth); // Endpunkt (breit, eine Seite)
-            ctx.lineTo(a2.x - nx * halfWidth, a2.y - ny * halfWidth); // Endpunkt (breit, andere Seite)
+            ctx.moveTo(a1.x, a1.y); 
+            ctx.lineTo(a2.x + nx * halfWidth, a2.y + ny * halfWidth); 
+            ctx.lineTo(a2.x - nx * halfWidth, a2.y - ny * halfWidth); 
             ctx.closePath();
             ctx.fill();
         } else if (bond.type === 6) {
             // Gestrichelter Keil (Dash)
-            const hashes = 8; // Anzahl der Striche
-            ctx.beginPath();
+            const hashes = 8; 
             for (let i = 1; i <= hashes; i++) {
                 const fraction = i / hashes;
                 const cx = a1.x + dx * fraction;
                 const cy = a1.y + dy * fraction;
-                const halfWidth = 5 * fraction; // Wird nach hinten immer breiter
+                const halfWidth = 5 * fraction; 
                 
                 ctx.moveTo(cx + nx * halfWidth, cy + ny * halfWidth);
                 ctx.lineTo(cx - nx * halfWidth, cy - ny * halfWidth);
             }
             ctx.stroke();
+        }
     }
 
     // --- ATOME ---
-    ctx.font = `bold ${options.fontSize || 16}px Arial`;; 
+    ctx.font = "bold 16px Arial"; 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (const atom of atoms) {
-        if (atom.element === "DUMMY") continue; // Dummy-Anker bleiben unsichtbar
-
-        if (atom.element === "TEXT") {
-            const txt = parseChemicalRichText(atom.customLabel || "");
-            ctx.fillStyle = "#000000";
-            ctx.fillText(txt, atom.x, atom.y);
-            continue; // Kein weißer Hintergrund, keine Warnungen für Freitext!
-        }
-        // TEXT-LOGIK 
-        const bondOnRight = isBondOnRightSide(atom, bonds, atoms);
-        
-        // Neu: Wir übergeben bondOnRight an getAtomLabel!
-        let rawLabel = atom.customLabel || getAtomLabel(atom, bonds, bondOnRight);
-        
-        if (atom.customLabel && atom.autoFlip && bondOnRight) {
-            rawLabel = rawLabel.split('').reverse().join('');
-        }
-
-        const label = parseChemicalRichText(rawLabel);
+        const label = getAtomLabel(atom, bonds);
         const isHidden = label === "";
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);
         
@@ -248,47 +228,28 @@ export function drawScene(
         const bgRadiusX = Math.max(12, textWidth / 2 + 4);
         const bgRadiusY = 13;
 
-        // Zentrierung für ALLE Atome (Custom & Automatisch) 
-        let shiftX = 0;
-        
-        // Wenn es ein Custom-Label mibt Ausrichtung ist, ODER ein automatisches Lael, das breiter ist als das nackte Element (z.B. CH₃)
-        if ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length)) {
-            
-            // Wir messen exakt die Breite des Haupt-Elements (z.B. "O", "C" oder den 1. Buchstaben des Custom-Labels)
-            const elementWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : atom.element).width;
-            const offset = (textWidth / 2) - (elementWidth / 2);
-            
-            if (bondOnRight) {
-                shiftX = -offset; // Text nach links, damit das Haupt-Element rechts andockt
-            } else {
-                shiftX = offset;  // Text nach rechts, damit das Haupt-Element links andockt
-            }
-        }
-        
-        const drawX = atom.x + shiftX;
-
         if (isError) {
             ctx.beginPath();
-            ctx.ellipse(drawX, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2); 
+            ctx.ellipse(atom.x, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
             ctx.fill();
         }
 
         ctx.beginPath();
-        ctx.ellipse(drawX, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2); 
+        ctx.ellipse(atom.x, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
         ctx.fillStyle = "#FFFFFF";
         ctx.fill();
 
         if (atom.radical) {
             ctx.beginPath();
-            ctx.arc(drawX + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2); 
+            ctx.arc(atom.x + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
             ctx.fillStyle = "#000000";
             ctx.fill();
         }
 
         if (!isHidden) {
             ctx.fillStyle = "#000000";
-            ctx.fillText(label, drawX, atom.y); 
+            ctx.fillText(label, atom.x, atom.y);
         }
     }
 
@@ -339,4 +300,4 @@ export function drawScene(
 
     // 3. WICHTIG: Kompletten Zeichenzustand am Ende wieder aufräumen!
     ctx.restore();
-}};
+}
