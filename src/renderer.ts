@@ -20,6 +20,7 @@ let currentFontSize = 16;
 let showValenceWarnings = true;
 let showGrid = false;
 let currentBondLength = 60; // (Standard: 60)
+let currentBondType = 1; // 1 = Normal, 5 = Keil (Wedge), 6 = Gestrichelt (Dash)
 
 // Für das Auswahl-Tool
 let lassoPath: {x: number, y: number}[] = []; 
@@ -227,8 +228,42 @@ canvas.addEventListener('mousemove', (e) => {
     } 
     // C) ATOM BEWEGEN
     else if (editMode === "move" && movingAtom) {
-        movingAtom.x = currentMouseX;
-        movingAtom.y = currentMouseY;
+        let targetX = currentMouseX;
+        let targetY = currentMouseY;
+
+        // Snapping ist aktiv, solange STRG NICHT gedrückt wird
+        if (!e.ctrlKey) {
+            const bonds = state.getBonds();
+            const atoms = state.getAtoms();
+            
+            // Finde heraus, wie viele Bindungen an diesem Atom hängen
+            const connectedBonds = bonds.filter(b => b.id1 === movingAtom!.id || b.id2 === movingAtom!.id);
+
+            if (connectedBonds.length === 1) {
+                // Fall 1: End-Atom -> Wir snappen im 30°-Winkel und fester Länge um den Nachbarn!
+                const neighborId = connectedBonds[0].id1 === movingAtom!.id ? connectedBonds[0].id2 : connectedBonds[0].id1;
+                const neighbor = atoms.find(a => a.id === neighborId);
+                
+                if (neighbor) {
+                    const dx = currentMouseX - neighbor.x;
+                    const dy = currentMouseY - neighbor.y;
+                    
+                    // Auf 30° (PI/6) runden
+                    const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 6)) * (Math.PI / 6);
+                    
+                    targetX = neighbor.x + Math.cos(angle) * currentBondLength;
+                    targetY = neighbor.y + Math.sin(angle) * currentBondLength;
+                }
+            } else {
+                // Fall 2: Mittleres oder freies Atom -> Wir snappen auf ein unsichtbares Raster
+                const snapGrid = 15; // 15px Raster fühlt sich beim freien Bewegen sehr gut an
+                targetX = Math.round(currentMouseX / snapGrid) * snapGrid;
+                targetY = Math.round(currentMouseY / snapGrid) * snapGrid;
+            }
+        }
+
+        movingAtom.x = targetX;
+        movingAtom.y = targetY;
         render();
     } 
     // D) LASSO & AUSWAHL
@@ -369,22 +404,6 @@ canvas.addEventListener('mouseup', (e) => {
     const currentEl = state.getCurrentElement(); 
 
     if (dragStartAtom) {
-        if (editMode === "arrow") {
-            if (wasDragging) {
-                state.saveState();
-                // Echte IDs für die unsichtbaren Anker-Atome vergeben
-                const startAtom: Atom = { id: state.getNextId(), element: "DUMMY", x: dragStartAtom.x, y: dragStartAtom.y };
-                state.addAtom(startAtom);
-                const endAtom: Atom = { id: state.getNextId(), element: "DUMMY", x, y };
-                state.addAtom(endAtom);
-                
-                // Bindung Typ 4 ist unser Reaktionspfeil!
-                state.addBond({ id1: startAtom.id, id2: endAtom.id, type: 4 });
-            }
-            dragStartAtom = null;
-            render();
-            return;
-        }
         // Wir haben auf einem Atom gestartet (Ziehen einer Bindung)
         const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
 
@@ -396,7 +415,8 @@ canvas.addEventListener('mouseup', (e) => {
             );
             if (!exists) {
                 state.saveState();
-                state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: 1 });
+                // HIER currentBondType einsetzen!
+                state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: currentBondType });
             }
         } else {
             // B) Ziehen ins Leere -> Neues Atom + Bindung
@@ -404,21 +424,21 @@ canvas.addEventListener('mouseup', (e) => {
                 state.saveState();
                 const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
                 state.addAtom(newAtom);
-                state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: 1 });
+                // HIER currentBondType einsetzen!
+                state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
             } else {
                 // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
                 const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms);
                 
                 // Kollisions-Check: Landen wir auf einem existierenden Atom?
-                const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); // Radius etwas kleiner
+                const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); 
                 
-                if (neighbor) {
-                   // Ring-Schluss Logik wäre hier, lassen wir simpel
-                } else {
+                if (!neighbor) {
                     state.saveState();
                     const newAtom: Atom = { id: state.getNextId(), element: currentEl, x: pos.x, y: pos.y };
                     state.addAtom(newAtom);
-                    state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: 1 });
+                    // HIER currentBondType einsetzen!
+                    state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
                 }
             }
         }
@@ -469,59 +489,124 @@ const textEditorAlign = document.getElementById('custom-text-align') as HTMLInpu
 let atomToEdit: Atom | null = null;
 
 // Tastaturkürzel Undo
+let clipboardData: { atoms: Atom[], bonds: Bond[] } | null = null;
+
+// Hotkeys aus dem LocalStorage laden (inklusive Werkzeuge!)
+let hotkeys = JSON.parse(localStorage.getItem('chemable-hotkeys') || '{"copy":"c","paste":"v","cut":"x","undo":"z","text":"t","draw":"d","move":"m","erase":"e","select":"l","arrow":"a"}');
+
+function copySelection() {
+    const selectedIds = state.getSelectedAtomIds();
+    if (selectedIds.size === 0) return;
+    
+    const atoms = state.getAtoms().filter(a => selectedIds.has(a.id));
+    const bonds = state.getBonds().filter(b => selectedIds.has(b.id1) && selectedIds.has(b.id2));
+    
+    clipboardData = JSON.parse(JSON.stringify({ atoms, bonds }));
+}
+
+function cutSelection() {
+    copySelection(); 
+    if (state.getSelectedAtomIds().size === 0) return;
+    
+    state.saveState();
+    const selectedIds = state.getSelectedAtomIds();
+    state.setAtoms(state.getAtoms().filter(a => !selectedIds.has(a.id)));
+    state.setBonds(state.getBonds().filter(b => !selectedIds.has(b.id1) && !selectedIds.has(b.id2)));
+    state.clearSelection();
+    render();
+}
+
+function pasteSelection() {
+    if (!clipboardData || clipboardData.atoms.length === 0) return;
+    state.saveState();
+    
+    const idMap = new Map<number, number>();
+    const pastedAtomIds: number[] = [];
+
+    let cx = 0, cy = 0;
+    clipboardData.atoms.forEach(a => { cx += a.x; cy += a.y; });
+    cx /= clipboardData.atoms.length;
+
+    const dx = currentMouseX - cx;
+    const dy = currentMouseY - cy;
+
+    clipboardData.atoms.forEach(a => {
+        const newId = state.getNextId();
+        idMap.set(a.id, newId);
+        const newAtom: Atom = { ...a, id: newId, x: a.x + dx, y: a.y + dy };
+        state.addAtom(newAtom);
+        pastedAtomIds.push(newId);
+    });
+
+    clipboardData.bonds.forEach(b => {
+        state.addBond({ ...b, id1: idMap.get(b.id1)!, id2: idMap.get(b.id2)!, type: currentBondType });
+    });
+
+    state.clearSelection();
+    state.selectAtoms(pastedAtomIds);
+    setMode("select");
+    isDraggingSelection = true; 
+    dragStartX = currentMouseX;
+    dragStartY = currentMouseY;
+    
+    render();
+}
+
+// ==========================================
+// --- DER NEUE KEYDOWN LISTENER ---
+// ==========================================
+
 document.addEventListener('keydown', (event) => {
+    // Blockieren, wenn der Nutzer gerade in ein Input-Feld tippt!
     if (event.target instanceof HTMLInputElement) return;
 
-    // 1. Undo
-    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
-        performUndo();
-    }
-    // 2. Ladungsänderung oder Radikal-Toggle
-    if (event.key === '+' || event.key === '-' || event.key === '*') {
-        const atoms = state.getAtoms();
-        // Finde das Atom unter der aktuellen Mausposition
-        const hoveredAtom = findAtomNearPosition(currentMouseX, currentMouseY, atoms, 20);
+    // Hier wird isCtrl definiert! (Prüft, ob Strg oder die Mac-Command-Taste gedrückt ist)
+    const key = event.key.toLowerCase();
+    const isCtrl = event.ctrlKey || event.metaKey;
+
+    // 1. Die anpassbaren Hotkeys (mit STRG)
+    if (isCtrl && key === hotkeys.copy) { copySelection(); event.preventDefault(); }
+    else if (isCtrl && key === hotkeys.paste) { pasteSelection(); event.preventDefault(); }
+    else if (isCtrl && key === hotkeys.cut) { cutSelection(); event.preventDefault(); }
+    else if (isCtrl && key === hotkeys.undo) { performUndo(); event.preventDefault(); }
+    
+    // 2. Die Werkzeug-Hotkeys (OHNE STRG)
+    else if (!isCtrl) {
+        if (key === hotkeys.draw) { setMode("draw"); }
+        else if (key === hotkeys.move) { setMode("move"); }
+        else if (key === hotkeys.erase) { setMode("erase"); }
+        else if (key === hotkeys.select) { setMode("select"); }
+        else if (key === hotkeys.arrow) { setMode("arrow"); }
         
-        if (hoveredAtom) {
-            state.saveState(); // State speichern für Undo
-            
-            if (event.key === '+') {
-                hoveredAtom.charge = (hoveredAtom.charge || 0) + 1;
-                if (hoveredAtom.charge > 3) hoveredAtom.charge = 3; // Max limit
-            } 
-            else if (event.key === '-') {
-                hoveredAtom.charge = (hoveredAtom.charge || 0) - 1;
-                if (hoveredAtom.charge < -3) hoveredAtom.charge = -3; // Min limit
-            } 
-            else if (event.key === '*') {
-                hoveredAtom.radical = !hoveredAtom.radical; // Radikal an/ausschalten
+        // Das Text-Werkzeug / Edit-Overlay
+        else if (key === hotkeys.text) {
+            const atoms = state.getAtoms();
+            const hoveredAtom = findAtomNearPosition(currentMouseX, currentMouseY, atoms, 20);
+            if (hoveredAtom) {
+                openTextEditor(hoveredAtom);
+                event.preventDefault();
+            } else if (editMode !== "text") {
+                setMode("text");
             }
-            
-            render();
         }
-    } else if (event.key === 't') {
+    }
+
+    // 3. Feste Hotkeys für Chemie (+, -, *)
+    if (key === '+' || key === '-' || key === '*') {
         const atoms = state.getAtoms();
         const hoveredAtom = findAtomNearPosition(currentMouseX, currentMouseY, atoms, 20);
-        
         if (hoveredAtom) {
-            atomToEdit = hoveredAtom;
-            
-            // Editor exakt über dem Atom platzieren (berücksichtigt Panning!)
-            const rect = canvas.getBoundingClientRect();
-            const screenX = hoveredAtom.x + panX + rect.left;
-            const screenY = hoveredAtom.y + panY + rect.top - 50; 
-            
-            textEditorDiv.style.left = screenX + 'px';
-            textEditorDiv.style.top = screenY + 'px';
-            textEditorDiv.style.display = 'block';
-            
-            textEditorInput.value = hoveredAtom.customLabel || "";
-            textEditorFlip.checked = hoveredAtom.autoFlip || false;
-            textEditorAlign.checked = hoveredAtom.alignFirstLetter || false;
-            
-            // Kurzer Timeout, damit der Fokus nach dem Tastendruck klappt
-            setTimeout(() => textEditorInput.focus(), 10);
-            event.preventDefault();
+            state.saveState(); 
+            if (key === '+') {
+                hoveredAtom.charge = (hoveredAtom.charge || 0) + 1;
+                if (hoveredAtom.charge > 3) hoveredAtom.charge = 3; 
+            } else if (key === '-') {
+                hoveredAtom.charge = (hoveredAtom.charge || 0) - 1;
+                if (hoveredAtom.charge < -3) hoveredAtom.charge = -3; 
+            } else if (key === '*') {
+                hoveredAtom.radical = !hoveredAtom.radical; 
+            }
+            render();
         }
     }
 });
@@ -577,7 +662,22 @@ function setMode(mode: "draw" | "move" | "erase" | "select" | "text" | "arrow") 
         canvas.style.cursor = "crosshair"; // Fadenkreuz fürs Zeichnen
     }
 }
-document.getElementById('btn-draw')?.addEventListener('click', () => setMode("draw"));
+// Das ersetzt die Logik aus meiner letzten Nachricht!
+document.getElementById('btn-draw')?.addEventListener('click', () => {
+    setMode("draw");
+    currentBondType = 1; // Normaler Stift
+});
+
+document.getElementById('btn-wedge')?.addEventListener('click', () => {
+    setMode("draw");
+    currentBondType = 5; // Keil-Stift
+});
+
+document.getElementById('btn-dash')?.addEventListener('click', () => {
+    setMode("draw");
+    currentBondType = 6; // Dash-Stift
+});
+
 document.getElementById('btn-move')?.addEventListener('click', () => setMode("move"));
 document.getElementById('btn-erase')?.addEventListener('click', () => setMode("erase"));
 document.getElementById('btn-clean')?.addEventListener('click', () => {
@@ -629,6 +729,44 @@ const pseMenu = document.getElementById('pse-menu');
 const pseGrid = document.getElementById('pse-grid');
 const currentElDisplay = document.getElementById('current-element-display');
 
+// --- HOTKEY DIALOG LOGIK ---
+const hotkeyDialog = document.getElementById('hotkeys-dialog');
+const btnHotkeys = document.getElementById('btn-hotkeys');
+
+if (btnHotkeys && hotkeyDialog) {
+    btnHotkeys.addEventListener('click', () => {
+        // Werte aus dem aktuellen hotkeys-Objekt in die Input-Felder laden
+        (document.getElementById('hk-copy') as HTMLInputElement).value = hotkeys.copy || 'c';
+        (document.getElementById('hk-paste') as HTMLInputElement).value = hotkeys.paste || 'v';
+        (document.getElementById('hk-cut') as HTMLInputElement).value = hotkeys.cut || 'x';
+        (document.getElementById('hk-undo') as HTMLInputElement).value = hotkeys.undo || 'z';
+        (document.getElementById('hk-text') as HTMLInputElement).value = hotkeys.text || 't';
+        
+        // Dialog sichtbar machen
+        hotkeyDialog.style.display = 'block';
+    });
+}
+
+document.getElementById('hk-btn-close')?.addEventListener('click', () => {
+    if (hotkeyDialog) hotkeyDialog.style.display = 'none';
+});
+
+document.getElementById('hk-btn-save')?.addEventListener('click', () => {
+    // Neue Werte auslesen und speichern
+    hotkeys.copy = (document.getElementById('hk-copy') as HTMLInputElement).value.toLowerCase() || 'c';
+    hotkeys.paste = (document.getElementById('hk-paste') as HTMLInputElement).value.toLowerCase() || 'v';
+    hotkeys.cut = (document.getElementById('hk-cut') as HTMLInputElement).value.toLowerCase() || 'x';
+    hotkeys.undo = (document.getElementById('hk-undo') as HTMLInputElement).value.toLowerCase() || 'z';
+    hotkeys.text = (document.getElementById('hk-text') as HTMLInputElement).value.toLowerCase() || 't';
+    
+    // Im Browser/Electron LocalStorage sichern
+    localStorage.setItem('chemable-hotkeys', JSON.stringify(hotkeys));
+    
+    // Dialog schließen
+    if (hotkeyDialog) hotkeyDialog.style.display = 'none';
+});
+
+
 // Funktion: PSE-Grid einmalig aufbauen
 function initPSE() {
     if (!pseGrid) return;
@@ -670,6 +808,7 @@ function initPSE() {
 document.getElementById('btn-arrow')?.addEventListener('click', () => setMode("arrow"));
 document.getElementById('btn-text')?.addEventListener('click', () => setMode("text"));
 
+//
 const fontSlider = document.getElementById('font-size-slider') as HTMLInputElement;
 const fontVal = document.getElementById('font-size-val');
 fontSlider?.addEventListener('input', () => {
@@ -677,6 +816,7 @@ fontSlider?.addEventListener('input', () => {
     if (fontVal) fontVal.innerText = currentFontSize.toString();
     render();
 });
+//
 
 // Initialisierung aufrufen
 initPSE();
@@ -856,7 +996,7 @@ fileInput?.addEventListener('change', (e) => {
                     return;
                 }
             }
-
+            // In src/renderer.ts
             const parsed = JSON.parse(jsonStr);
             if (parsed.atoms && parsed.bonds) {
                 state.saveState();
@@ -911,7 +1051,7 @@ document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
         
         // Zum aktuellen State hinzufügen
         atoms.forEach(a => state.addAtom(a));
-        bonds.forEach(b => state.addBond(b));
+        bonds.forEach(b => state.addBond({ ...b, type: currentBondType }));
         
         // DER MAGISCHE TRICK: Wir jagen die NEUEN Atome direkt durch das Auto-Layout!
         applyAutoLayout(atoms, state.getBonds());

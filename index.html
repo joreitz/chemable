@@ -1,101 +1,83 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="de">
+<head>
     <meta charset="UTF-8">
-    <title>Mein Chemie Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemable Editor</title>
     <style>
-      body { font-family: sans-serif; }
-      
-      /* Toolbar Styling */
-      #toolbar { margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
-      button { padding: 5px 10px; cursor: pointer; }
-
-      /* Das PSE Popup (Initial versteckt) */
-      #pse-menu {
-        display: none; /* Standardmäßig unsichtbar */
-        position: absolute;
-        top: 50px; left: 10px;
-        background: white;
-        border: 2px solid #333;
-        padding: 10px;
-        box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
-        z-index: 1000; /* Immer ganz oben */
-      }
-
-      /* Das Raster für die Elemente */
-      #pse-grid {
-        display: grid;
-        grid-template-columns: repeat(18, 30px); /* 18 Spalten à 30px */
-        grid-template-rows: repeat(7, 30px);     /* 7 Zeilen à 30px */
-        gap: 2px;
-      }
-
-      /* Die einzelnen Element-Kacheln */
-      .element-btn {
-        width: 100%; height: 100%;
-        border: 1px solid #999;
-        font-size: 10px;
-        font-weight: bold;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .element-btn:hover { border-color: black; transform: scale(1.1); }
+        /* Grundlegendes Layout */
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #f4f4f4; }
+        
+        /* Dropdown CSS für die Menüleiste */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 2000; border-radius: 4px; border: 1px solid #ccc; }
+        .dropdown:hover .dropdown-content { display: block; }
+        .dropdown-content button { width: 100%; text-align: left; padding: 10px 16px; border: none; background: none; cursor: pointer; font-size: 14px; }
+        .dropdown-content button:hover { background-color: #e2e3e5; }
+        .menu-btn { border: none; background: none; font-weight: bold; padding: 8px 12px; cursor: pointer; font-size: 14px; }
+        .menu-btn:hover { background-color: #e2e3e5; border-radius: 4px; }
     </style>
-  </head>
-  <body>
-    <h1>Chemie Editor Alpha</h1>
-    
-    <div id="toolbar">
-  <button id="btn-draw" style="font-weight:bold; background-color:#ddd;">✏️ Zeichnen</button>
-  <button id="btn-move">Move</button>
-  <button id="btn-erase">Erase</button>
-  <button id="btn-select">Lasso</button>
-  <button id="btn-text" style="font-weight:bold;">Abc Text</button>
-  <button id="btn-arrow" style="font-weight:bold;">➔ Pfeil</button>
-  
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  
-  <label for="bond-length-slider" style="font-size: 13px;">Länge: <span id="bond-length-val">60</span></label>
-  <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 80px; vertical-align: middle;">
-  
-  <label for="font-size-slider" style="font-size: 13px; margin-left: 5px;">Schrift: <span id="font-size-val">16</span></label>
-  <input type="range" id="font-size-slider" min="10" max="36" value="16" style="width: 70px; vertical-align: middle;">
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  
-  <button id="btn-pse">Choose element...</button>
-  <span id="current-element-display" style="font-weight: bold; margin-left: 5px;">[ C ]</span>
+</head>
+<body>
 
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  <button id="btn-undo">Undo</button>
-  <button id="btn-clear">Clear</button>
-  <button id="btn-clean">Clean-up</button>
+    <div id="menubar" style="background: #f0f0f0; padding: 5px 10px; border-bottom: 1px solid #ccc; font-family: sans-serif; display: flex; align-items: center;">
+        
+        <div class="dropdown">
+            <button class="menu-btn">📂 Datei</button>
+            <div class="dropdown-content">
+                <button id="btn-save">💾 Speichern (.chem)</button>
+                <button id="btn-load">📂 Öffnen</button>
+                <hr style="margin: 0; border: 0; border-top: 1px solid #ccc;">
+                <button id="btn-export-svg">🖼️ Export als SVG</button>
+                <button id="btn-export-pdf">📄 Export als PDF</button>
+                <button id="btn-smiles">🧬 SMILES Im-/Export</button>
+            </div>
+        </div>
 
-  <button id="btn-warnings" style="background-color: #ffcccc;">⚠️ Warnings: On</button>
-  
-  <button id="btn-grid" style="background-color: #eee;">🔲 Grid: Off</button>
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  <button id="btn-save" style="background-color: #e2e3e5;">💾 Speichern (.chema)</button>
-  <button id="btn-load" style="background-color: #e2e3e5;">📂 Öffnen</button>
-  <input type="file" id="file-load" style="display: none;" accept=".chem,.svg" />
-  <button id="btn-smiles" style="background-color: #ffe8a1; font-weight: bold;">🧬 SMILES</button>
+        <div class="dropdown">
+            <button class="menu-btn">✏️ Bearbeiten</button>
+            <div class="dropdown-content">
+                <button id="btn-undo">↩️ Rückgängig (Strg+Z)</button>
+                <button id="btn-clean">✨ Auto-Layout (Clean)</button>
+                <button id="btn-clear">🗑️ Alles löschen</button>
+                <hr style="margin: 0; border: 0; border-top: 1px solid #ccc;">
+                <button id="btn-hotkeys">⌨️ Hotkeys anpassen</button>
+            </div>
+        </div>
 
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  <label for="bond-length-slider" style="font-size: 13px;">Länge: <span id="bond-length-val">60</span></label>
-  <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 80px; vertical-align: middle;">
-  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
-  <button id="btn-export-svg" style="background-color: #d4edda; font-weight: bold;">💾 SVG</button>
-  <button id="btn-export-pdf" style="background-color: #f8d7da; font-weight: bold;">📄 PDF</button>
-</div> 
+        <div class="dropdown">
+            <button class="menu-btn">👁️ Ansicht</button>
+            <div class="dropdown-content">
+                <button id="btn-warnings" style="background-color: #ffcccc;"> Warnungen: An</button>
+                <button id="btn-grid">🔲 Raster: Aus</button>
+            </div>
+        </div>
 
-<div id="pse-menu">
-  <div id="pse-grid">
-  </div>
-  <button id="btn-close-pse" style="margin-top: 10px; width: 100%;">Close</button>
-</div>
+        <div style="margin-left: auto; display: flex; align-items: center; font-size: 13px;">
+            <label for="bond-length-slider">Länge: <span id="bond-length-val">60</span></label>
+            <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 70px; margin: 0 10px 0 5px;">
+            <label for="font-size-slider">Schrift: <span id="font-size-val">16</span></label>
+            <input type="range" id="font-size-slider" min="10" max="36" value="16" style="width: 70px; margin-left: 5px;">
+        </div>
+    </div>
 
-    <canvas id="chemBoard" width="800" height="600" style="border:1px solid #ccc; cursor: crosshair;"></canvas>
+    <div id="toolbar" style="background: #ffffff; padding: 8px 10px; border-bottom: 1px solid #ccc; font-family: sans-serif; display: flex; gap: 5px;">
+        <button id="btn-draw" style="font-weight:bold; background-color:#ddd;" title="Zeichnen (D)">✏️ Zeichnen</button>
+        <button id="btn-wedge" title="Keil (W)"> Keil</button>
+        <button id="btn-dash" title="Gestrichelt (S)">/// Dash</button>
+        <button id="btn-move" title="Verschieben (M)"> Move</button>
+        <button id="btn-erase" title="Radierer (E)"> Erase</button>
+        <button id="btn-select" title="Lasso Auswahl (L)"> Lasso</button>
+        <button id="btn-text" title="Freitext (T)">Abc Text</button>
+        <button id="btn-arrow" title="Reaktionspfeil (A)">➔ Pfeil</button>
+        
+        <span style="border-left: 1px solid #ccc; height: 24px; margin: 0 5px;"></span>
+        
+        <button id="btn-pse">Atom wählen...</button>
+        <span id="current-element-display" style="font-weight: bold; margin-left: 5px; align-self: center;">[ C ]</span>
+    </div>
+
+    <canvas id="chemBoard" width="800" height="600" style="background-color: white; cursor: crosshair; display: block;"></canvas>
 
     <div id="custom-text-editor" style="display:none; position:absolute; z-index:1000; background:white; border:2px solid #0088ff; border-radius:4px; padding:8px; box-shadow:0 4px 10px rgba(0,0,0,0.2); font-family: sans-serif;">
         <input type="text" id="custom-text-input" placeholder="z.B. OPO_3^(2-)" style="width:150px; outline:none; border:1px solid #ccc; padding:4px; margin-bottom: 5px;">
@@ -110,6 +92,7 @@
         <br>
         <button id="custom-text-save" style="cursor:pointer; margin-top: 5px; width: 100%; background: #0088ff; color: white; border: none; padding: 4px;">OK</button>
     </div>
+
     <div id="smiles-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border:2px solid #333; border-radius:8px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; text-align: center; font-family: sans-serif;">
         <h3 style="margin-top:0;">SMILES Code</h3>
         <input type="text" id="smiles-input" style="width: 350px; padding: 8px; font-family: monospace; font-size: 14px; margin-bottom: 15px;" />
@@ -117,8 +100,22 @@
         <button id="smiles-btn-import" style="padding: 8px 15px; cursor: pointer; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold;">Als Molekül Importieren</button>
         <button id="smiles-btn-close" style="padding: 8px 15px; cursor: pointer; background: #ccc; border: none; border-radius: 4px; margin-left: 10px;">Schließen</button>
     </div>
+
+    <div id="hotkeys-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border:2px solid #333; border-radius:8px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; font-family: sans-serif; width: 300px;">
+        <h3 style="margin-top:0;">Tastenkürzel</h3>
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px; align-items: center;">
+            <label>Kopieren (Strg +)</label><input type="text" id="hk-copy" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+            <label>Einfügen (Strg +)</label><input type="text" id="hk-paste" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+            <label>Ausschneiden (Strg +)</label><input type="text" id="hk-cut" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+            <label>Rückgängig (Strg +)</label><input type="text" id="hk-undo" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+            <label>Text-Editor</label><input type="text" id="hk-text" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+        </div>
+        <button id="hk-btn-save" style="padding: 8px; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold; width: 100%; cursor: pointer;">Speichern</button>
+        <button id="hk-btn-close" style="padding: 8px; margin-top: 5px; background: #ccc; border: none; border-radius: 4px; width: 100%; cursor: pointer;">Abbrechen</button>
+    </div>
+
     <script>
       require('./dist/renderer.js');
     </script>
-  </body>
+</body>
 </html>

@@ -188,8 +188,30 @@ export function drawScene(
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
             continue;
-        }
-        ctx.stroke();
+        } else if (bond.type === 5) {
+            // Voll-Keil (Wedge)
+            const halfWidth = 5; // Wie breit der Keil am Ende wird
+            ctx.fillStyle = "#000000";
+            ctx.beginPath();
+            ctx.moveTo(a1.x, a1.y); // Startpunkt (spitz)
+            ctx.lineTo(a2.x + nx * halfWidth, a2.y + ny * halfWidth); // Endpunkt (breit, eine Seite)
+            ctx.lineTo(a2.x - nx * halfWidth, a2.y - ny * halfWidth); // Endpunkt (breit, andere Seite)
+            ctx.closePath();
+            ctx.fill();
+        } else if (bond.type === 6) {
+            // Gestrichelter Keil (Dash)
+            const hashes = 8; // Anzahl der Striche
+            ctx.beginPath();
+            for (let i = 1; i <= hashes; i++) {
+                const fraction = i / hashes;
+                const cx = a1.x + dx * fraction;
+                const cy = a1.y + dy * fraction;
+                const halfWidth = 5 * fraction; // Wird nach hinten immer breiter
+                
+                ctx.moveTo(cx + nx * halfWidth, cy + ny * halfWidth);
+                ctx.lineTo(cx - nx * halfWidth, cy - ny * halfWidth);
+            }
+            ctx.stroke();
     }
 
     // --- ATOME ---
@@ -317,4 +339,4 @@ export function drawScene(
 
     // 3. WICHTIG: Kompletten Zeichenzustand am Ende wieder aufräumen!
     ctx.restore();
-}
+}};
