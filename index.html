@@ -79,6 +79,7 @@
   <button id="btn-save" style="background-color: #e2e3e5;">💾 Speichern (.chema)</button>
   <button id="btn-load" style="background-color: #e2e3e5;">📂 Öffnen</button>
   <input type="file" id="file-load" style="display: none;" accept=".chem,.svg" />
+  <button id="btn-smiles" style="background-color: #ffe8a1; font-weight: bold;">🧬 SMILES</button>
 
   <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
   <label for="bond-length-slider" style="font-size: 13px;">Länge: <span id="bond-length-val">60</span></label>
@@ -109,7 +110,13 @@
         <br>
         <button id="custom-text-save" style="cursor:pointer; margin-top: 5px; width: 100%; background: #0088ff; color: white; border: none; padding: 4px;">OK</button>
     </div>
-
+    <div id="smiles-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border:2px solid #333; border-radius:8px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; text-align: center; font-family: sans-serif;">
+        <h3 style="margin-top:0;">SMILES Code</h3>
+        <input type="text" id="smiles-input" style="width: 350px; padding: 8px; font-family: monospace; font-size: 14px; margin-bottom: 15px;" />
+        <br>
+        <button id="smiles-btn-import" style="padding: 8px 15px; cursor: pointer; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold;">Als Molekül Importieren</button>
+        <button id="smiles-btn-close" style="padding: 8px 15px; cursor: pointer; background: #ccc; border: none; border-radius: 4px; margin-left: 10px;">Schließen</button>
+    </div>
     <script>
       require('./dist/renderer.js');
     </script>

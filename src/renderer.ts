@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import { generateSVG } from "./export";
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
+import { generateSmiles, parseSmiles } from './smiles';
 
 // Lokale UI-Variablen (Dinge, die NICHT im History-Undo gespeichert werden müssen)
 let editMode: "draw" | "move" | "erase" | "select" | "text" | "arrow" = "draw";
@@ -877,6 +878,48 @@ fileInput?.addEventListener('change', (e) => {
     fileInput.value = ""; // Reset, damit man die gleiche Datei nochmal laden kann
 });
 
+const smilesDialog = document.getElementById('smiles-dialog')!;
+const smilesInput = document.getElementById('smiles-input') as HTMLInputElement;
+
+document.getElementById('btn-smiles')?.addEventListener('click', () => {
+    // 1. Export: Wenn man klickt, wird das aktuelle Molekül als SMILES berechnet
+    const currentSmiles = generateSmiles(state.getAtoms(), state.getBonds());
+    smilesInput.value = currentSmiles;
+    
+    // 2. Dialog anzeigen
+    smilesDialog.style.display = 'block';
+    smilesInput.focus();
+    smilesInput.select(); // Direkt markieren zum schnellen Kopieren (Strg+C)
+});
+
+document.getElementById('smiles-btn-close')?.addEventListener('click', () => {
+    smilesDialog.style.display = 'none';
+});
+
+document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
+    const inputStr = smilesInput.value.trim();
+    if (inputStr) {
+        state.saveState();
+        
+        // Wir platzieren es in der Mitte des Bildschirms (inkl. Panning)
+        const rect = canvas.getBoundingClientRect();
+        const startX = (rect.width / 2) - panX;
+        const startY = (rect.height / 2) - panY;
+        
+        // Atome und Bindungen generieren
+        const { atoms, bonds } = parseSmiles(inputStr, startX, startY);
+        
+        // Zum aktuellen State hinzufügen
+        atoms.forEach(a => state.addAtom(a));
+        bonds.forEach(b => state.addBond(b));
+        
+        // DER MAGISCHE TRICK: Wir jagen die NEUEN Atome direkt durch das Auto-Layout!
+        applyAutoLayout(atoms, state.getBonds());
+        
+        render();
+    }
+    smilesDialog.style.display = 'none';
+});
 
 initPSE();
 
