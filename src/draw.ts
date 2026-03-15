@@ -6,7 +6,7 @@ import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
 
 // Ersetzt _() und ^() durch echte Unicode-Sub/Superscripts!
-function parseChemicalRichText(text: string): string {
+export function parseChemicalRichText(text: string): string {
     const subMap: any = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉', '+': '₊', '-': '₋'};
     const supMap: any = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹', '+': '⁺', '-': '⁻'};
 
@@ -16,7 +16,7 @@ function parseChemicalRichText(text: string): string {
 }
 
 // Prüft, ob sich die Bindung rechts vom Atom befindet (dann muss der Text umgedreht werden)
-function isBondOnRightSide(atom: Atom, bonds: Bond[], atoms: Atom[]): boolean {
+export function isBondOnRightSide(atom: Atom, bonds: Bond[], atoms: Atom[]): boolean {
     const connected = bonds.filter(b => b.id1 === atom.id || b.id2 === atom.id);
     if (connected.length === 1) { // Ergibt nur Sinn am Ende einer Kette
         const partnerId = connected[0].id1 === atom.id ? connected[0].id2 : connected[0].id1;
@@ -38,7 +38,8 @@ export interface DrawOptions {
     dragStartAtom: Atom | null;
     mousePos: { x: number, y: number };
     lassoPath?: {x: number, y: number}[]; 
-    selectedAtomIds?: Set<number>;        
+    selectedAtomIds?: Set<number>;
+    fontSize?: number;        
 }
 
 function getNeighborCoords(
@@ -170,28 +171,52 @@ export function drawScene(
             ctx.lineTo(a2.x + nx * o, a2.y + ny * o);
             ctx.moveTo(a1.x - nx * o, a1.y - ny * o);
             ctx.lineTo(a2.x - nx * o, a2.y - ny * o);
+        } else if (bond.type === 4) {
+            // Zeichne den geraden Strich
+            ctx.beginPath();
+            ctx.moveTo(a1.x, a1.y);
+            ctx.lineTo(a2.x, a2.y);
+            ctx.stroke();
+
+            // Zeichne die Pfeilspitze
+            const headlen = 12;
+            const angle = Math.atan2(dy, dx);
+            ctx.beginPath();
+            ctx.moveTo(a2.x, a2.y);
+            ctx.lineTo(a2.x - headlen * Math.cos(angle - Math.PI / 6), a2.y - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(a2.x, a2.y);
+            ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.stroke();
+            continue;
         }
         ctx.stroke();
     }
 
     // --- ATOME ---
-    ctx.font = "bold 16px Arial"; 
+    ctx.font = `bold ${options.fontSize || 16}px Arial`;; 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (const atom of atoms) {
+        if (atom.element === "DUMMY") continue; // Dummy-Anker bleiben unsichtbar
+
+        if (atom.element === "TEXT") {
+            const txt = parseChemicalRichText(atom.customLabel || "");
+            ctx.fillStyle = "#000000";
+            ctx.fillText(txt, atom.x, atom.y);
+            continue; // Kein weißer Hintergrund, keine Warnungen für Freitext!
+        }
         // TEXT-LOGIK 
-        let rawLabel = atom.customLabel || getAtomLabel(atom, bonds);
+        const bondOnRight = isBondOnRightSide(atom, bonds, atoms);
         
-        // Wenn der Nutzer "Zur Bindung ausrichten" angeklickt hat UND die Bindung rechts ist:
-        if (atom.customLabel && atom.autoFlip && isBondOnRightSide(atom, bonds, atoms)) {
-            // Dreht den rohen Text um (z.B. "OH" -> "HO")
+        // Neu: Wir übergeben bondOnRight an getAtomLabel!
+        let rawLabel = atom.customLabel || getAtomLabel(atom, bonds, bondOnRight);
+        
+        if (atom.customLabel && atom.autoFlip && bondOnRight) {
             rawLabel = rawLabel.split('').reverse().join('');
         }
 
-        // Formatiert _() und ^()
         const label = parseChemicalRichText(rawLabel);
-        // -----------------------
         const isHidden = label === "";
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);
         
@@ -201,28 +226,47 @@ export function drawScene(
         const bgRadiusX = Math.max(12, textWidth / 2 + 4);
         const bgRadiusY = 13;
 
+        // Zentrierung für ALLE Atome (Custom & Automatisch) 
+        let shiftX = 0;
+        
+        // Wenn es ein Custom-Label mibt Ausrichtung ist, ODER ein automatisches Lael, das breiter ist als das nackte Element (z.B. CH₃)
+        if ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length)) {
+            
+            // Wir messen exakt die Breite des Haupt-Elements (z.B. "O", "C" oder den 1. Buchstaben des Custom-Labels)
+            const elementWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : atom.element).width;
+            const offset = (textWidth / 2) - (elementWidth / 2);
+            
+            if (bondOnRight) {
+                shiftX = -offset; // Text nach links, damit das Haupt-Element rechts andockt
+            } else {
+                shiftX = offset;  // Text nach rechts, damit das Haupt-Element links andockt
+            }
+        }
+        
+        const drawX = atom.x + shiftX;
+
         if (isError) {
             ctx.beginPath();
-            ctx.ellipse(atom.x, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(drawX, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2); 
             ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
             ctx.fill();
         }
 
         ctx.beginPath();
-        ctx.ellipse(atom.x, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
+        ctx.ellipse(drawX, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2); 
         ctx.fillStyle = "#FFFFFF";
         ctx.fill();
 
         if (atom.radical) {
             ctx.beginPath();
-            ctx.arc(atom.x + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
+            ctx.arc(drawX + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2); 
             ctx.fillStyle = "#000000";
             ctx.fill();
         }
 
         if (!isHidden) {
             ctx.fillStyle = "#000000";
-            ctx.fillText(label, atom.x, atom.y);
+            ctx.fillText(label, drawX, atom.y); 
         }
     }
 

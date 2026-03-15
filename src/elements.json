@@ -199,9 +199,7 @@
     "covTripleBondRadius": 95,
     "electronegativity": 2.58,
     "valency": [
-      2,
-      4,
-      6
+      2
     ],
     "colorValue": "#FFFF30"
   },

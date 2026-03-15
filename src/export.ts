@@ -2,6 +2,7 @@
 import { Atom, Bond } from "./types";
 import { getAtomLabel } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
+import { parseChemicalRichText, isBondOnRightSide } from "./draw";
 
 // Hilfsfunktion aus draw.ts kopiert, um Abhängigkeiten zu minimieren
 function getNeighborCoords(atomA: Atom, atomB: Atom, allBonds: Bond[], allAtoms: Atom[]): { x: number, y: number }[] {
@@ -25,7 +26,7 @@ function getNeighborCoords(atomA: Atom, atomB: Atom, allBonds: Bond[], allAtoms:
     return neighbors;
 }
 
-export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set<number>): string {
+export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set<number>, fontSize: number = 16): string {
     // 1. Filtern: Exportieren wir alles oder nur die Auswahl?
     const isSelection = selectedIds.size > 0;
     const exportAtoms = isSelection ? allAtoms.filter(a => selectedIds.has(a.id)) : allAtoms;
@@ -58,7 +59,7 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
     svg += `  <style>
     .bond { stroke: #000; stroke-width: 2; stroke-linecap: round; }
     .atom-bg { fill: #fff; }
-    .atom-text { font-family: Arial, sans-serif; font-weight: bold; font-size: 16px; fill: #000; text-anchor: middle; dominant-baseline: central; }
+    .atom-text { font-family: Arial, sans-serif; font-weight: bold; font-size: ${fontSize}px; fill: #000; text-anchor: middle; dominant-baseline: central; }
   </style>\n`;
 
     // 4. Bindungen zeichnen
@@ -94,20 +95,57 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             const o = 4;
             svg += `  <line class="bond" x1="${x1 + nx*o}" y1="${y1 + ny*o}" x2="${x2 + nx*o}" y2="${y2 + ny*o}" />\n`;
             svg += `  <line class="bond" x1="${x1 - nx*o}" y1="${y1 - ny*o}" x2="${x2 - nx*o}" y2="${y2 - ny*o}" />\n`;
+        } else if (bond.type === 4) {
+            svg += `  <line class="bond" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />\n`;
+            const headlen = 12;
+            const angle = Math.atan2(dy, dx);
+            const h1x = x2 - headlen * Math.cos(angle - Math.PI / 6);
+            const h1y = y2 - headlen * Math.sin(angle - Math.PI / 6);
+            const h2x = x2 - headlen * Math.cos(angle + Math.PI / 6);
+            const h2y = y2 - headlen * Math.sin(angle + Math.PI / 6);
+            svg += `  <line class="bond" x1="${x2}" y1="${y2}" x2="${h1x}" y2="${h1y}" />\n`;
+            svg += `  <line class="bond" x1="${x2}" y1="${y2}" x2="${h2x}" y2="${h2y}" />\n`;
         }
     });
 
     // 5. Atome zeichnen
     exportAtoms.forEach(atom => {
-        const label = getAtomLabel(atom, allBonds);
+        if (atom.element === "DUMMY") return; // Nichts zeichnen
+        
+        if (atom.element === "TEXT") {
+            const txt = parseChemicalRichText(atom.customLabel || "");
+            svg += `  <text class="atom-text" x="${atom.x + offX}" y="${atom.y + offY}">${txt}</text>\n`;
+            return;
+        }
+        const bondOnRight = isBondOnRightSide(atom, allBonds, allAtoms);
+        
+        let rawLabel = atom.customLabel || getAtomLabel(atom, allBonds, bondOnRight);
+        
+        if (atom.customLabel && atom.autoFlip && bondOnRight) {
+            rawLabel = rawLabel.split('').reverse().join('');
+        }
+
+        const label = parseChemicalRichText(rawLabel);
         const isHidden = label === "";
         
         if (isHidden) return;
 
-        const ax = atom.x + offX;
+        let shiftX = 0;
+        if ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length)) {
+            const fullWidth = label.length * 10;
+            const elementWidth = atom.customLabel ? 10 : (atom.element.length * 10);
+            const offset = (fullWidth / 2) - (elementWidth / 2);
+            
+            if (bondOnRight) {
+                shiftX = -offset;
+            } else {
+                shiftX = offset;
+            }
+        }
+
+        const ax = atom.x + offX + shiftX; 
         const ay = atom.y + offY;
 
-        // Näherung für die Breite im SVG
         const textWidth = label.length * 10; 
         const bgRadiusX = Math.max(12, textWidth / 2 + 4);
         const bgRadiusY = 13;
@@ -120,15 +158,18 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             svg += `  <circle cx="${ax + bgRadiusX - 2}" cy="${ay - bgRadiusY + 2}" r="2.5" fill="#000" />\n`;
         }
 
-        // Text (ersetzt subscripts durch SVG tspan)
-        // Einfache Variante: Rendern des puren Strings. Subscripts sehen im SVG passabel aus, 
-        // da die Unicode-Subscripts aus chemistry.ts verwendet werden (z.B. CH₃).
         svg += `  <text class="atom-text" x="${ax}" y="${ay}">${label}</text>\n`;
-    });
-    // 6. Chemische Daten als JSON in <desc> einbetten (kann später beim Import wieder ausgelesen werden!!)
+    }); // Ende der forEach-Schleife
+
+    // WICHTIG: Hier kommt der fehlende Teil!
+    
+    // Den State als unsichtbaren Text (Metadaten) ins SVG einbetten (fürs erneute Laden)
     const dataToEmbed = JSON.stringify({ atoms: exportAtoms, bonds: exportBonds });
     svg += `  <desc id="chemable-data">${dataToEmbed}</desc>\n`;
 
+    // SVG schließen
     svg += `</svg>`;
+    
+    // String zurückgeben! Ohne das gibt es den Kompilierungsfehler.
     return svg;
 }

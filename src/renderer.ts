@@ -14,7 +14,8 @@ import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
 
 // Lokale UI-Variablen (Dinge, die NICHT im History-Undo gespeichert werden müssen)
-let editMode: "draw" | "move" | "erase" | "select" = "draw";
+let editMode: "draw" | "move" | "erase" | "select" | "text" | "arrow" = "draw";
+let currentFontSize = 16;
 let showValenceWarnings = true;
 let showGrid = false;
 let currentBondLength = 60; // (Standard: 60)
@@ -43,19 +44,30 @@ let isPanning = false;
 let lastPanMouseX = 0;
 let lastPanMouseY = 0;
 
+function openTextEditor(atom: Atom) {
+    atomToEdit = atom;
+    const rect = canvas.getBoundingClientRect();
+    textEditorDiv.style.left = (atom.x + panX + rect.left) + 'px';
+    textEditorDiv.style.top = (atom.y + panY + rect.top - 50) + 'px';
+    textEditorDiv.style.display = 'block';
+    textEditorInput.value = atom.customLabel || "";
+    textEditorFlip.checked = atom.autoFlip || false;
+    textEditorAlign.checked = atom.alignFirstLetter || false;
+    setTimeout(() => textEditorInput.focus(), 10);
+}
 
 function render() {
-    if (verboose) {console.log("🎨 Render wird aufgerufen. Atome:", state.getAtoms().length);}
     drawScene(ctx, canvas.width, canvas.height, state.getAtoms(), state.getBonds(), {
+        showValenceWarnings,
         showGrid,
         panX,
         panY,
-        showValenceWarnings,
         selectedAtomId: null, 
         dragStartAtom,
         mousePos: { x: currentMouseX, y: currentMouseY },
         lassoPath: lassoPath,
-        selectedAtomIds: state.getSelectedAtomIds()
+        selectedAtomIds: state.getSelectedAtomIds(),
+        fontSize: currentFontSize // <--- NEU
     });
 }
 
@@ -88,6 +100,7 @@ canvas.addEventListener('mousedown', (e) => {
     const x = (e.clientX - rect.left) - panX;
     const y = (e.clientY - rect.top) - panY;
     const atoms = state.getAtoms();
+    const bonds = state.getBonds();
 
     // B) ROTATION (Rechtsklick)
     if (e.button === 2) {
@@ -110,35 +123,50 @@ canvas.addEventListener('mousedown', (e) => {
 
     // C) NORMALE WERKZEUGE (Linksklick)
     if (e.button === 0) {
-        if (editMode === "draw") {
-            const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
-            if (clickedAtom) {
-                dragStartAtom = clickedAtom;
-            } else {
-                dragStartAtom = { id: Date.now(), element: currentElDisplay?.innerText.replace(/[\[\] ]/g, '') || "C", x, y };
-                state.saveState();
-                state.addAtom(dragStartAtom);
-            }
+        // WICHTIG: IMMER Startkoordinaten speichern, damit mouseup weiß, wie weit gezogen wurde!
+        dragStartX = x;
+        dragStartY = y;
+
+        if (editMode === "text") {
+            state.saveState();
+            const textAtom: Atom = { id: state.getNextId(), element: "TEXT", customLabel: "Reaktion 1", x, y };
+            state.addAtom(textAtom);
+            openTextEditor(textAtom); // Öffnet sofort das Eingabefeld!
+            render();
+            return;
+        } 
+        else if (editMode === "arrow") {
+            // Wir erstellen ein temporäres "Dummy" Atom für den Startpunkt
+            dragStartAtom = { id: Date.now(), element: "DUMMY", x, y };
+            return;
+        }
+        else if (editMode === "draw") {
+            // NUR schauen, ob wir auf einem Atom starten. Das Erstellen passiert erst im mouseup!
+            dragStartAtom = findAtomNearPosition(x, y, atoms, 20);
         } 
         else if (editMode === "move") {
-            const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
-            if (clickedAtom) {
-                movingAtom = clickedAtom;
-                state.saveState();
-            }
+            movingAtom = findAtomNearPosition(x, y, atoms, 20);
         } 
         else if (editMode === "erase") {
-            // (Deine Radierer-Logik, falls du sie hier hattest, sonst in mouseup)
-        } 
-        else if (editMode === "select") {
+            const atomHit = findAtomNearPosition(x, y, atoms, 20);
+            if (atomHit) {
+                state.saveState(); 
+                state.setAtoms(atoms.filter(a => a.id !== atomHit.id));
+                state.setBonds(bonds.filter(b => b.id1 !== atomHit.id && b.id2 !== atomHit.id));
+            } else {
+                const bondHit = getBondAtCoords(x, y, bonds, atoms);
+                if (bondHit) {
+                    state.saveState(); 
+                    state.setBonds(bonds.filter(b => b !== bondHit));
+                }
+            }
+        } else if (editMode === "select") {
             const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
             const selectedIDs = state.getSelectedAtomIds();
             
             // Wenn man auf ein bereits markiertes Atom klickt -> Auswahl verschieben
             if (clickedAtom && selectedIDs.has(clickedAtom.id)) {
                 isDraggingSelection = true;
-                dragStartX = x;
-                dragStartY = y;
                 state.saveState();
             } 
             // Ansonsten -> Neue Lasso-Auswahl starten
@@ -177,8 +205,11 @@ canvas.addEventListener('mousemove', (e) => {
     currentMouseY = (e.clientY - rect.top) - panY;
 
     // B) ZEICHNEN (Live-Vorschau mit Snapping)
-    if (editMode === "draw" && dragStartAtom) {
-        if (!e.ctrlKey) {
+    if ((editMode === "draw" || editMode === "arrow") && dragStartAtom) {
+        // Pfeile lassen wir einfach frei rotieren (ohne Snapping), das ist meistens schöner.
+        if (editMode === "arrow") {
+            currentMouseX = currentMouseX; 
+        } else if (!e.ctrlKey) {
             const dx = currentMouseX - dragStartAtom.x;
             const dy = currentMouseY - dragStartAtom.y;
             const rawDist = Math.sqrt(dx*dx + dy*dy);
@@ -326,7 +357,7 @@ canvas.addEventListener('mouseup', (e) => {
         return;
     }
 
-    // --- 4. ZEICHEN MODUS (Hier werden Atome erstellt!) ---
+    //  4. ZEICHEN MODUS  
     
     const atoms = state.getAtoms();
     const bonds = state.getBonds();
@@ -337,6 +368,22 @@ canvas.addEventListener('mouseup', (e) => {
     const currentEl = state.getCurrentElement(); 
 
     if (dragStartAtom) {
+        if (editMode === "arrow") {
+            if (wasDragging) {
+                state.saveState();
+                // Echte IDs für die unsichtbaren Anker-Atome vergeben
+                const startAtom: Atom = { id: state.getNextId(), element: "DUMMY", x: dragStartAtom.x, y: dragStartAtom.y };
+                state.addAtom(startAtom);
+                const endAtom: Atom = { id: state.getNextId(), element: "DUMMY", x, y };
+                state.addAtom(endAtom);
+                
+                // Bindung Typ 4 ist unser Reaktionspfeil!
+                state.addBond({ id1: startAtom.id, id2: endAtom.id, type: 4 });
+            }
+            dragStartAtom = null;
+            render();
+            return;
+        }
         // Wir haben auf einem Atom gestartet (Ziehen einer Bindung)
         const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
 
@@ -417,6 +464,7 @@ document.getElementById('btn-undo')?.addEventListener('click', performUndo);
 const textEditorDiv = document.getElementById('custom-text-editor')!;
 const textEditorInput = document.getElementById('custom-text-input') as HTMLInputElement;
 const textEditorFlip = document.getElementById('custom-text-flip') as HTMLInputElement;
+const textEditorAlign = document.getElementById('custom-text-align') as HTMLInputElement;
 let atomToEdit: Atom | null = null;
 
 // Tastaturkürzel Undo
@@ -468,6 +516,7 @@ document.addEventListener('keydown', (event) => {
             
             textEditorInput.value = hoveredAtom.customLabel || "";
             textEditorFlip.checked = hoveredAtom.autoFlip || false;
+            textEditorAlign.checked = hoveredAtom.alignFirstLetter || false;
             
             // Kurzer Timeout, damit der Fokus nach dem Tastendruck klappt
             setTimeout(() => textEditorInput.focus(), 10);
@@ -482,7 +531,7 @@ function saveCustomText() {
         const val = textEditorInput.value.trim();
         atomToEdit.customLabel = val === "" ? undefined : val;
         atomToEdit.autoFlip = textEditorFlip.checked;
-        
+        atomToEdit.alignFirstLetter = textEditorAlign.checked;
         atomToEdit = null;
         textEditorDiv.style.display = 'none';
         render();
@@ -499,7 +548,7 @@ textEditorInput.addEventListener('keydown', (e) => {
 });
 
 // Modus umschalten
-function setMode(mode: "draw" | "move" | "erase" | "select") {
+function setMode(mode: "draw" | "move" | "erase" | "select" | "text" | "arrow") {
     editMode = mode;
     
     // 1. Alle Buttons resetten (Farbe entfernen)
@@ -617,6 +666,17 @@ function initPSE() {
     }
 }
 
+document.getElementById('btn-arrow')?.addEventListener('click', () => setMode("arrow"));
+document.getElementById('btn-text')?.addEventListener('click', () => setMode("text"));
+
+const fontSlider = document.getElementById('font-size-slider') as HTMLInputElement;
+const fontVal = document.getElementById('font-size-val');
+fontSlider?.addEventListener('input', () => {
+    currentFontSize = parseInt(fontSlider.value);
+    if (fontVal) fontVal.innerText = currentFontSize.toString();
+    render();
+});
+
 // Initialisierung aufrufen
 initPSE();
 
@@ -683,7 +743,7 @@ document.getElementById('btn-export-svg')?.addEventListener('click', () => {
     const bonds = state.getBonds();
     const selectedIds = state.getSelectedAtomIds();
 
-    const svgString = generateSVG(atoms, bonds, selectedIds);
+    const svgString = generateSVG(atoms, bonds, selectedIds, currentFontSize);
     if (!svgString) {
         alert("Nichts zum Exportieren vorhanden!");
         return;

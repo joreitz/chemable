@@ -6,7 +6,8 @@ export interface Atom {
     charge?: number;
     radical?: boolean;
     customLabel?: string;
-    autoFlip?: boolean;   
+    autoFlip?: boolean;
+    alignFirstLetter?: boolean;   
 }
 
 export interface Bond {

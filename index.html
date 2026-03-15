@@ -52,6 +52,16 @@
   <button id="btn-move">Move</button>
   <button id="btn-erase">Erase</button>
   <button id="btn-select">Lasso</button>
+  <button id="btn-text" style="font-weight:bold;">Abc Text</button>
+  <button id="btn-arrow" style="font-weight:bold;">➔ Pfeil</button>
+  
+  <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
+  
+  <label for="bond-length-slider" style="font-size: 13px;">Länge: <span id="bond-length-val">60</span></label>
+  <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 80px; vertical-align: middle;">
+  
+  <label for="font-size-slider" style="font-size: 13px; margin-left: 5px;">Schrift: <span id="font-size-val">16</span></label>
+  <input type="range" id="font-size-slider" min="10" max="36" value="16" style="width: 70px; vertical-align: middle;">
   <span style="border-left: 1px solid #ccc; height: 20px; margin: 0 5px;"></span>
   
   <button id="btn-pse">Choose element...</button>
@@ -85,19 +95,23 @@
 </div>
 
     <canvas id="chemBoard" width="800" height="600" style="border:1px solid #ccc; cursor: crosshair;"></canvas>
-    
-    <script>
-      require('./dist/renderer.js');
-    </script>
 
-  <div id="custom-text-editor" style="display:none; position:absolute; z-index:1000; background:white; border:2px solid #0088ff; border-radius:4px; padding:8px; box-shadow:0 4px 10px rgba(0,0,0,0.2); font-family: sans-serif;">
+    <div id="custom-text-editor" style="display:none; position:absolute; z-index:1000; background:white; border:2px solid #0088ff; border-radius:4px; padding:8px; box-shadow:0 4px 10px rgba(0,0,0,0.2); font-family: sans-serif;">
         <input type="text" id="custom-text-input" placeholder="z.B. OPO_3^(2-)" style="width:150px; outline:none; border:1px solid #ccc; padding:4px; margin-bottom: 5px;">
         <br>
         <label style="font-size: 12px; cursor: pointer;">
             <input type="checkbox" id="custom-text-flip"> Zur Bindung ausrichten
         </label>
         <br>
+        <label style="font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="custom-text-align"> Am 1. Buchstaben zentrieren
+        </label>
+        <br>
         <button id="custom-text-save" style="cursor:pointer; margin-top: 5px; width: 100%; background: #0088ff; color: white; border: none; padding: 4px;">OK</button>
     </div>
-</body>
+
+    <script>
+      require('./dist/renderer.js');
+    </script>
+  </body>
 </html>
