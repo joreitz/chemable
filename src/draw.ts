@@ -238,15 +238,34 @@ export function drawScene(
     }
 
     // --- ATOME ---
-    ctx.font = "bold 16px Arial"; 
+    ctx.font = `bold ${options.fontSize || 16}px Arial`; 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (const atom of atoms) {
+        // 1. Pfeil-Anker ignorieren (DUMMY)
+        if (atom.element.toUpperCase() === "DUMMY") continue; 
 
-        if (atom.element.toUpperCase() === "DUMMY") continue;
+        // 2. Reine Freitext-Elemente zeichnen
+        if (atom.element === "TEXT") {
+            const txt = parseChemicalRichText(atom.customLabel || "");
+            ctx.fillStyle = "#000000";
+            ctx.fillText(txt, atom.x, atom.y);
+            continue; 
+        }
 
-        const label = getAtomLabel(atom, bonds);
+        // 3. Normale Atome (und überschriebene Atom-Labels)
+        const bondOnRight = isBondOnRightSide(atom, bonds, atoms);
+        
+        // WICHTIG: Hier geben wir dem customLabel Vorrang!
+        let rawLabel = atom.customLabel || getAtomLabel(atom, bonds, bondOnRight);
+        
+        // Text umdrehen (z.B. OHC statt CHO), falls der Haken im Editor gesetzt war
+        if (atom.customLabel && atom.autoFlip && bondOnRight) {
+            rawLabel = rawLabel.split('').reverse().join('');
+        }
+
+        const label = parseChemicalRichText(rawLabel);
         const isHidden = label === "";
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);
         
@@ -255,29 +274,43 @@ export function drawScene(
         const textWidth = ctx.measureText(label || "C").width;
         const bgRadiusX = Math.max(12, textWidth / 2 + 4);
         const bgRadiusY = 13;
+        
+        // Verschiebe-Logik für sauberes Andocken von Bindungen an Text
+        let shiftX = 0;
+        if ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length)) {
+            const elementWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : atom.element).width;
+            const offset = (textWidth / 2) - (elementWidth / 2);
+            shiftX = bondOnRight ? -offset : offset;
+        }
+        
+        const drawX = atom.x + shiftX;
 
+        // Roter Warn-Hintergrund
         if (isError) {
             ctx.beginPath();
-            ctx.ellipse(atom.x, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(drawX, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
             ctx.fill();
         }
 
+        // Weißer Atom-Hintergrund (überdeckt Bindungslinien)
         ctx.beginPath();
-        ctx.ellipse(atom.x, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
+        ctx.ellipse(drawX, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
         ctx.fillStyle = "#FFFFFF";
         ctx.fill();
 
+        // Radikalpunkt
         if (atom.radical) {
             ctx.beginPath();
-            ctx.arc(atom.x + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
+            ctx.arc(drawX + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
             ctx.fillStyle = "#000000";
             ctx.fill();
         }
 
+        // Atom-/Text-Label zeichnen
         if (!isHidden) {
             ctx.fillStyle = "#000000";
-            ctx.fillText(label, atom.x, atom.y);
+            ctx.fillText(label, drawX, atom.y);
         }
     }
 

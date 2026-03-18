@@ -64,7 +64,6 @@ export function calculateBondOffsetDirection(
     const dx = end.x - start.x;
     const dy = end.y - start.y;
 
-    // Normalenvektor (90° Drehung)
     const nx = -dy;
     const ny = dx;
 
@@ -74,20 +73,18 @@ export function calculateBondOffsetDirection(
         const vnx = pos.x - start.x;
         const vny = pos.y - start.y;
 
-        // Skalarprodukt bestimmt die Seite
         const dot = nx * vnx + ny * vny;
         
-        // FIX: Wir nutzen Math.sign, damit jeder Nachbar genau EINE Stimme hat.
-        // Das verhindert, dass weit entfernte Substituenten die Ring-Struktur "überstimmen".
+        // --- DER FIX ---
+        // Jeder Nachbar bekommt genau EINE Stimme (+1 oder -1). 
+        // Weite Distanzen können das Ergebnis so nicht mehr verfälschen.
         if (dot > 0.001) votes++;
         else if (dot < -0.001) votes--;
     }
 
-    // Wenn keine Nachbarn da sind, Standard (1)
     if (neighbors.length === 0) return 1;
 
-    // Die Mehrheit entscheidet, auf welche Seite der zweite Strich gezeichnet wird.
-    // Bei Benzol gewinnen die Ring-Atome (2 Stimmen) gegen den Substituenten (1 Stimme).
+    // Mehrheitsentscheid: Ring-Atome gewinnen immer gegen einzelne Substituenten
     return votes >= 0 ? 1 : -1;
 }
 // Ray-Casting-Algorithmus

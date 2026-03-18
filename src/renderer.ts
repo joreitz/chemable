@@ -149,9 +149,14 @@ canvas.addEventListener('mousedown', (e) => {
             return;
         }
         else if (editMode === "draw") {
-            // NUR schauen, ob wir auf einem Atom starten. Das Erstellen passiert erst im mouseup!
+            // NUR schauen, ob wir auf einem Atom starten. 
             dragStartAtom = findAtomNearPosition(x, y, atoms, 20);
-        } 
+            
+            // Reine Freitext-Elemente dürfen niemals als Startpunkt für Bindungen dienen!
+            if (dragStartAtom && dragStartAtom.element === "TEXT") {
+                dragStartAtom = null;
+            }
+        }
         else if (editMode === "move") {
             movingAtom = findAtomNearPosition(x, y, atoms, 20);
         } 
@@ -436,7 +441,7 @@ canvas.addEventListener('mouseup', (e) => {
                     state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
                 } else {
                     // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
-                    const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms);
+                    const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms, currentBondLength);
                     const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); 
                     
                     if (!neighbor) {
