@@ -106,6 +106,48 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             const h2y = y2 - headlen * Math.sin(angle + Math.PI / 6);
             svg += `  <line class="bond" x1="${x2}" y1="${y2}" x2="${h1x}" y2="${h1y}" />\n`;
             svg += `  <line class="bond" x1="${x2}" y1="${y2}" x2="${h2x}" y2="${h2y}" />\n`;
+            
+        } else if (bond.type === 5) {
+            // --- KEIL (Wedge) für SVG exportieren ---
+            const startWidth = 1.0; 
+            const endWidth = 5.0; 
+            const extension = 2.0; 
+            
+            const ux = dx / len;
+            const uy = dy / len;
+            const ex = x2 + ux * extension;
+            const ey = y2 + uy * extension;
+
+            const p1x = x1 + nx * startWidth, p1y = y1 + ny * startWidth;
+            const p2x = x1 - nx * startWidth, p2y = y1 - ny * startWidth;
+            const p3x = ex - nx * endWidth, p3y = ey - ny * endWidth;
+            const p4x = ex + nx * endWidth, p4y = ey + ny * endWidth;
+
+            // Ein SVG-Polygon füllen
+            svg += `  <polygon points="${p1x},${p1y} ${p2x},${p2y} ${p3x},${p3y} ${p4x},${p4y}" fill="#000" />\n`;
+
+        } else if (bond.type === 6) {
+            // --- DASHES für SVG exportieren ---
+            const hashes = 6; 
+            const startGap = 4.0; 
+            const endGap = 2.0;
+            const effectiveLen = len - startGap - endGap;
+
+            for (let i = 0; i < hashes; i++) {
+                const step = startGap + (i / (hashes - 1)) * effectiveLen;
+                const fraction = step / len;
+                
+                const cx = x1 + dx * fraction;
+                const cy = y1 + dy * fraction;
+                
+                const currentWidth = 1.0 + (4.0 * fraction); 
+                
+                const p1x = cx + nx * currentWidth, p1y = cy + ny * currentWidth;
+                const p2x = cx - nx * currentWidth, p2y = cy - ny * currentWidth;
+                
+                // SVG-Linien mit der gleichen CSS-Klasse wie normale Bindungen
+                svg += `  <line class="bond" x1="${p1x}" y1="${p1y}" x2="${p2x}" y2="${p2y}" />\n`;
+            }
         }
     });
 
