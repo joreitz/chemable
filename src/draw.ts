@@ -188,41 +188,46 @@ export function drawScene(
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
         } else if (bond.type === 5) {
-            // --- VOLL-KEIL (Wedge) ---
-            const startWidth = 1.0; 
+            // --- VERBESSERTER KEIL (Wedge) ---
+            const startWidth = 1.0; // Startet auf der Breite der normalen Linie (2px)
             const endWidth = 5.0; 
             
-            // Wir verlängern das breite Ende minimal (1.5px), 
-
-            const extension = 1.5;
-            const ex = a2.x + (dx / len) * extension;
-            const ey = a2.y + (dy / len) * extension;
+            // Wir verlängern das breite Ende um 2 Pixel, um die "Lücke" 
+            // an Verzweigungen (z.B. Isopropyl) zu schließen.
+            const extension = 2.0; 
+            const ux = dx / len;
+            const uy = dy / len;
+            const ex = a2.x + ux * extension;
+            const ey = a2.y + uy * extension;
 
             ctx.fillStyle = "#000000";
+            ctx.lineJoin = "round"; // Macht die Ecken weicher
             ctx.beginPath();
-            // Start (schmal)
+            // Startseite (kleines Trapez statt spitzer Punkt)
             ctx.moveTo(a1.x + nx * startWidth, a1.y + ny * startWidth);
             ctx.lineTo(a1.x - nx * startWidth, a1.y - ny * startWidth);
-            // Ende (breit & leicht verlängert für sauberen Anschluss)
+            // Endseite (breit und leicht verlängert)
             ctx.lineTo(ex - nx * endWidth, ey - ny * endWidth);
             ctx.lineTo(ex + nx * endWidth, ey + ny * endWidth);
             ctx.closePath();
             ctx.fill();
 
         } else if (bond.type === 6) {
-            // --- GESTRICHELTER KEIL (Dash) ---
-            const hashes = 6; 
-            const startOffset = 0.15; 
-            const endOffset = 0.85;   
+            // --- VERBESSERTER GESTRICHELTER KEIL (Dash) ---
+            const hashes = 6; // Etwas weniger Striche für mehr Abstand
+            const startGap = 4.0; // Abstand zum Start-Atom
+            const endGap = 2.0;   // Abstand zum Ziel-Atom
+            const effectiveLen = len - startGap - endGap;
 
+            ctx.beginPath();
             for (let i = 0; i < hashes; i++) {
-                
-                const fraction = startOffset + (i / (hashes - 1)) * (endOffset - startOffset);
+                const step = startGap + (i / (hashes - 1)) * effectiveLen;
+                const fraction = step / len;
                 
                 const cx = a1.x + dx * fraction;
                 const cy = a1.y + dy * fraction;
                 
-                // Die Breite wächst weiterhin von schmal nach breit
+                // Breite wächst von schmal nach breit
                 const currentWidth = 1.0 + (4.0 * fraction); 
                 
                 ctx.moveTo(cx + nx * currentWidth, cy + ny * currentWidth);
