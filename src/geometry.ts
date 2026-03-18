@@ -57,34 +57,91 @@ export function getBondAtCoords(x: number, y: number, bonds: Bond[], atoms: Atom
 }
 
 export function calculateBondOffsetDirection(
-    start: { x: number, y: number },
-    end: { x: number, y: number },
-    neighbors: { x: number, y: number }[]
+    a1: any,
+    a2: any,
+    bonds: any[],
+    atoms: any[]
 ): number {
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-
+    const dx = a2.x - a1.x;
+    const dy = a2.y - a1.y;
     const nx = -dy;
     const ny = dx;
 
-    let votes = 0;
+    // --- 1. PROFI-RING-ERKENNUNG (BFS-Algorithmus) ---
+    // Wir suchen den kürzesten Weg von a1 nach a2, ohne die direkte Bindung zu nutzen.
+    const queue: { id: number, path: number[] }[] = [{ id: a1.id, path: [a1.id] }];
+    const visited = new Set<number>();
+    visited.add(a1.id);
 
-    for (const pos of neighbors) {
-        const vnx = pos.x - start.x;
-        const vny = pos.y - start.y;
+    let ringPath: number[] | null = null;
 
-        const dot = nx * vnx + ny * vny;
+    while (queue.length > 0) {
+        const current = queue.shift()!;
         
-        // --- DER FIX ---
-        // Jeder Nachbar bekommt genau EINE Stimme (+1 oder -1). 
-        // Weite Distanzen können das Ergebnis so nicht mehr verfälschen.
+        // Ring gefunden! (Muss aus mind. 3 Atomen bestehen)
+        if (current.id === a2.id && current.path.length > 2) {
+            ringPath = current.path;
+            break;
+        }
+
+        for (const b of bonds) {
+            // Die direkte Doppelbindung zwischen a1 und a2 ignorieren wir für die Wegsuche
+            if ((b.id1 === a1.id && b.id2 === a2.id) || (b.id1 === a2.id && b.id2 === a1.id)) continue;
+
+            let nextId = null;
+            if (b.id1 === current.id) nextId = b.id2;
+            else if (b.id2 === current.id) nextId = b.id1;
+
+            if (nextId && !visited.has(nextId)) {
+                visited.add(nextId);
+                queue.push({ id: nextId, path: [...current.path, nextId] });
+            }
+        }
+    }
+
+    // Wenn die Bindung in einem Ring liegt -> Doppelbindung zeigt IMMER exakt zur Ring-Mitte!
+    if (ringPath) {
+        let cx = 0, cy = 0;
+        for (const id of ringPath) {
+            const atom = atoms.find(a => a.id === id);
+            if (atom) {
+                cx += atom.x;
+                cy += atom.y;
+            }
+        }
+        cx /= ringPath.length;
+        cy /= ringPath.length;
+
+        const midX = (a1.x + a2.x) / 2;
+        const midY = (a1.y + a2.y) / 2;
+        
+        // Vektor von der Bindung zur Ring-Mitte
+        const vx = cx - midX;
+        const vy = cy - midY;
+        
+        const dot = nx * vx + ny * vy;
+        return dot >= 0 ? 1 : -1;
+    }
+
+    // --- 2. FALLBACK FÜR NORMALE KETTEN ---
+    let votes = 0;
+    const neighbors = [];
+    for (const b of bonds) {
+        if (b.id1 === a1.id && b.id2 !== a2.id) neighbors.push(atoms.find(a => a.id === b.id2));
+        else if (b.id2 === a1.id && b.id1 !== a2.id) neighbors.push(atoms.find(a => a.id === b.id1));
+        else if (b.id1 === a2.id && b.id2 !== a1.id) neighbors.push(atoms.find(a => a.id === b.id2));
+        else if (b.id2 === a2.id && b.id1 !== a1.id) neighbors.push(atoms.find(a => a.id === b.id1));
+    }
+
+    for (const n of neighbors) {
+        if (!n) continue;
+        const vnx = n.x - a1.x;
+        const vny = n.y - a1.y;
+        const dot = nx * vnx + ny * vny;
         if (dot > 0.001) votes++;
         else if (dot < -0.001) votes--;
     }
 
-    if (neighbors.length === 0) return 1;
-
-    // Mehrheitsentscheid: Ring-Atome gewinnen immer gegen einzelne Substituenten
     return votes >= 0 ? 1 : -1;
 }
 // Ray-Casting-Algorithmus

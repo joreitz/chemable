@@ -144,8 +144,8 @@ export function drawScene(
         let offset = 5;
 
         if (bond.type === 2 || bond.type === 3) {
-            const neighbors = getNeighborCoords(a1, a2, bonds, atoms);
-            const direction = calculateBondOffsetDirection(a1, a2, neighbors);
+            // FIX: Wir übergeben jetzt 'bonds' und 'atoms' für die Ring-Erkennung!
+            const direction = calculateBondOffsetDirection(a1, a2, bonds, atoms);
             offset = offset * direction; 
         }
 
