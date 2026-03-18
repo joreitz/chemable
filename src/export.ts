@@ -79,8 +79,7 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
         if (bond.type === 1) {
             svg += `  <line class="bond" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />\n`;
         } else if (bond.type === 2) {
-            const neighbors = getNeighborCoords(a1, a2, allBonds, allAtoms);
-            const direction = calculateBondOffsetDirection(a1, a2, neighbors);
+            const direction = calculateBondOffsetDirection(a1, a2, allBonds, allAtoms);
             const offset = 5 * direction;
             
             svg += `  <line class="bond" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />\n`;
@@ -88,6 +87,8 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             const shiftX = nx * offset, shiftY = ny * offset;
             const ux = dx / len, uy = dy / len;
             const px = ux * 3, py = uy * 3; // Padding
+            
+            svg += `  <line class="bond" x1="${x1 + shiftX + px}" y1="${y1 + shiftY + py}" x2="${x2 + shiftX - px}" y2="${y2 + shiftY - py}" />\n`;
             
             svg += `  <line class="bond" x1="${x1 + shiftX + px}" y1="${y1 + shiftY + py}" x2="${x2 + shiftX - px}" y2="${y2 + shiftY - py}" />\n`;
         } else if (bond.type === 3) {
