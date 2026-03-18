@@ -188,25 +188,45 @@ export function drawScene(
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
         } else if (bond.type === 5) {
-            // Voll-Keil (Wedge)
-            const halfWidth = 5; 
+            // --- VOLL-KEIL (Wedge) ---
+            const startWidth = 1.0; 
+            const endWidth = 5.0; 
+            
+            // Wir verlängern das breite Ende minimal (1.5px), 
+
+            const extension = 1.5;
+            const ex = a2.x + (dx / len) * extension;
+            const ey = a2.y + (dy / len) * extension;
+
             ctx.fillStyle = "#000000";
-            ctx.moveTo(a1.x, a1.y); 
-            ctx.lineTo(a2.x + nx * halfWidth, a2.y + ny * halfWidth); 
-            ctx.lineTo(a2.x - nx * halfWidth, a2.y - ny * halfWidth); 
+            ctx.beginPath();
+            // Start (schmal)
+            ctx.moveTo(a1.x + nx * startWidth, a1.y + ny * startWidth);
+            ctx.lineTo(a1.x - nx * startWidth, a1.y - ny * startWidth);
+            // Ende (breit & leicht verlängert für sauberen Anschluss)
+            ctx.lineTo(ex - nx * endWidth, ey - ny * endWidth);
+            ctx.lineTo(ex + nx * endWidth, ey + ny * endWidth);
             ctx.closePath();
             ctx.fill();
+
         } else if (bond.type === 6) {
-            // Gestrichelter Keil (Dash)
-            const hashes = 8; 
-            for (let i = 1; i <= hashes; i++) {
-                const fraction = i / hashes;
+            // --- GESTRICHELTER KEIL (Dash) ---
+            const hashes = 6; 
+            const startOffset = 0.15; 
+            const endOffset = 0.85;   
+
+            for (let i = 0; i < hashes; i++) {
+                
+                const fraction = startOffset + (i / (hashes - 1)) * (endOffset - startOffset);
+                
                 const cx = a1.x + dx * fraction;
                 const cy = a1.y + dy * fraction;
-                const halfWidth = 5 * fraction; 
                 
-                ctx.moveTo(cx + nx * halfWidth, cy + ny * halfWidth);
-                ctx.lineTo(cx - nx * halfWidth, cy - ny * halfWidth);
+                // Die Breite wächst weiterhin von schmal nach breit
+                const currentWidth = 1.0 + (4.0 * fraction); 
+                
+                ctx.moveTo(cx + nx * currentWidth, cy + ny * currentWidth);
+                ctx.lineTo(cx - nx * currentWidth, cy - ny * currentWidth);
             }
             ctx.stroke();
         }
@@ -218,6 +238,9 @@ export function drawScene(
     ctx.textBaseline = "middle";
 
     for (const atom of atoms) {
+
+        if (atom.element.toUpperCase() === "DUMMY") continue;
+
         const label = getAtomLabel(atom, bonds);
         const isHidden = label === "";
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);

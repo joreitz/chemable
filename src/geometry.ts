@@ -61,38 +61,34 @@ export function calculateBondOffsetDirection(
     end: { x: number, y: number },
     neighbors: { x: number, y: number }[]
 ): number {
-    // 1. Vektor der Bindung (A -> B)
     const dx = end.x - start.x;
     const dy = end.y - start.y;
 
-    // 2. Normalenvektor berechnen (90° gedreht)
-    // Dieser Vektor zeigt quasi "nach rechts" von der Linie aus gesehen.
+    // Normalenvektor (90° Drehung)
     const nx = -dy;
     const ny = dx;
 
-    let sumDot = 0;
+    let votes = 0;
 
-    // 3. Für jeden Nachbarn prüfen: Liegt er in Richtung der Normalen?
     for (const pos of neighbors) {
-        // Vektor vom Startpunkt zum Nachbarn
         const vnx = pos.x - start.x;
         const vny = pos.y - start.y;
 
-        // Skalarprodukt: 
-        // > 0 bedeutet: Der Nachbar liegt auf der Seite der Normalen ("rechts")
-        // < 0 bedeutet: Der Nachbar liegt auf der anderen Seite ("links")
+        // Skalarprodukt bestimmt die Seite
         const dot = nx * vnx + ny * vny;
         
-        // Wir summieren alle Ergebnisse. Die Mehrheit gewinnt.
-        sumDot += dot;
+        // FIX: Wir nutzen Math.sign, damit jeder Nachbar genau EINE Stimme hat.
+        // Das verhindert, dass weit entfernte Substituenten die Ring-Struktur "überstimmen".
+        if (dot > 0.001) votes++;
+        else if (dot < -0.001) votes--;
     }
 
-    // Wenn gar keine Nachbarn da sind (isoliertes Alken), nehmen wir Standard (1)
+    // Wenn keine Nachbarn da sind, Standard (1)
     if (neighbors.length === 0) return 1;
 
-    // Wenn die Summe positiv ist, liegen die meisten Nachbarn "rechts".
-    // Also zeichnen wir den zweiten Strich auch rechts.
-    return sumDot >= 0 ? 1 : -1;
+    // Die Mehrheit entscheidet, auf welche Seite der zweite Strich gezeichnet wird.
+    // Bei Benzol gewinnen die Ring-Atome (2 Stimmen) gegen den Substituenten (1 Stimme).
+    return votes >= 0 ? 1 : -1;
 }
 // Ray-Casting-Algorithmus
 // src/math.ts

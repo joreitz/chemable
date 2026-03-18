@@ -452,24 +452,32 @@ canvas.addEventListener('mouseup', (e) => {
             // Wir haben im Leeren gestartet (Klick auf Hintergrund oder Klick auf Bindung)
             const clickedBond = getBondAtCoords(x, y, bonds, atoms);
             
-            if (clickedBond && !wasDragging) {
-                // Klick auf Bindung
-                state.saveState();
-                if (currentBondType === 1) {
-                    // Wenn normaler Stift: Typ durchwechseln (Einfach, Zweifach, Dreifach)
-                    clickedBond.type = (clickedBond.type % 3) + 1; 
-                } else {
-                    // Wenn Keil/Dash-Stift: Bindung direkt in Keil/Dash umwandeln!
-                    clickedBond.type = currentBondType;
-                }
-            } else if (!wasDragging && !clickedBond) {
-                // Klick ins Leere -> FREIES ATOM ERSTELLEN
-                state.saveState();
-                const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
-                state.addAtom(newAtom);
-            }
         }
-    }
+        // 1. Prüfen, ob eine Bindung angeklickt wurde
+        const bond = getBondAt(canvasX, canvasY, state.getBonds(), state.getAtoms());
+        
+        if (bond && !wasDragging) {
+            state.saveState();
+            
+            // Wenn wir den normalen Stift (Typ 1) haben -> 1-2-3 durchwechseln
+            if (currentBondType === 1) {
+                bond.type = (bond.type % 3) + 1;
+            } 
+            // Wenn wir Keil (5) oder Dash (6) ausgewählt haben
+            else if (currentBondType === 5 || currentBondType === 6) {
+                if (bond.type === currentBondType) {
+                    // Wenn die Bindung schon dieser Typ ist -> RICHTUNG FLIPPEN
+                    const temp = bond.id1;
+                    bond.id1 = bond.id2;
+                    bond.id2 = temp;
+                } else {
+                    // Ansonsten Typ ändern
+                    bond.type = currentBondType;
+                }
+            }
+            drawScene(canvas, ctx, state.getAtoms(), state.getBonds(), Option);
+            return; 
+        } 
     render();
 });
 // --- UI BUTTONS ---
