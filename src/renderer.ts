@@ -52,6 +52,10 @@ let isPanning = false;
 let lastPanMouseX = 0;
 let lastPanMouseY = 0;
 
+let globalBondSpacing = 5;
+let globalFontFamily = "Arial";
+let globalColor = "#000000";
+
 function openTextEditor(atom: Atom) {
     atomToEdit = atom;
     const rect = canvas.getBoundingClientRect();
@@ -75,7 +79,10 @@ function render() {
         mousePos: { x: currentMouseX, y: currentMouseY },
         lassoPath: lassoPath,
         selectedAtomIds: state.getSelectedAtomIds(),
-        fontSize: currentFontSize // <--- NEU
+        fontSize: currentFontSize, // <--- NEU
+        globalBondSpacing,
+        globalFontFamily,
+        globalColor
     });
 }
 
@@ -395,7 +402,7 @@ canvas.addEventListener('mouseup', (e) => {
         return;
     }
 
-    // --- 4. ZEICHEN MODUS & PFEILE ---
+    // 4. ZEICHEN MODUS & PFEILE 
     if (editMode === "draw" || editMode === "arrow") {
         const atoms = state.getAtoms();
         const bonds = state.getBonds();
@@ -420,7 +427,12 @@ canvas.addEventListener('mouseup', (e) => {
             }
 
             // Normales Zeichnen (Bindung ziehen)
-            const dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
+            let dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
+
+            // --- Text-Elemente als Ziel ignorieren ---
+            if (dragEndAtom && dragEndAtom.element === "TEXT") {
+                dragEndAtom = null;
+            }
 
             if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
                 // A) Verbindung zu existierendem Atom
@@ -1083,6 +1095,75 @@ document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
         render();
     }
     smilesDialog.style.display = 'none';
+});
+
+// --- STYLE MENU LOGIK ---
+const stylePanel = document.getElementById('style-panel');
+const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
+const spacingSlider = document.getElementById('bond-spacing-slider') as HTMLInputElement;
+const spacingVal = document.getElementById('bond-spacing-val');
+const fontSelect = document.getElementById('font-family-select') as HTMLSelectElement;
+
+// Menü öffnen/schließen
+document.getElementById('btn-style-menu')?.addEventListener('click', () => {
+    if (stylePanel) {
+        stylePanel.style.display = stylePanel.style.display === 'block' ? 'none' : 'block';
+    }
+});
+document.getElementById('btn-close-style-panel')?.addEventListener('click', () => {
+    if (stylePanel) stylePanel.style.display = 'none';
+});
+
+// Farbe ändern
+colorPicker?.addEventListener('input', () => {
+    const newColor = colorPicker.value;
+    const selectedIds = state.getSelectedAtomIds();
+    
+    if (selectedIds.size > 0) {
+        state.saveState(); // Fürs Undo
+        state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.color = newColor; });
+        state.getBonds().forEach(b => { 
+            if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.color = newColor; 
+        });
+    } else {
+        globalColor = newColor; // Globale Variable (siehe Schritt 3 in der vorherigen Nachricht)
+    }
+    render();
+});
+
+// Abstand der Doppelbindung ändern
+spacingSlider?.addEventListener('input', () => {
+    const newSpacing = parseFloat(spacingSlider.value);
+    if (spacingVal) spacingVal.innerText = newSpacing.toString();
+    const selectedIds = state.getSelectedAtomIds();
+    
+    if (selectedIds.size > 0) {
+        state.getBonds().forEach(b => {
+            if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.spacing = newSpacing;
+        });
+    } else {
+        globalBondSpacing = newSpacing;
+    }
+    render();
+});
+
+// Fürs Undo beim Slider-Loslassen (analog zu deinem Bond-Length-Slider)
+spacingSlider?.addEventListener('change', () => {
+    state.saveState();
+});
+
+// Schriftart ändern
+fontSelect?.addEventListener('change', () => {
+    const newFont = fontSelect.value;
+    const selectedIds = state.getSelectedAtomIds();
+    
+    if (selectedIds.size > 0) {
+        state.saveState();
+        state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.fontFamily = newFont; });
+    } else {
+        globalFontFamily = newFont;
+    }
+    render();
 });
 
 initPSE();

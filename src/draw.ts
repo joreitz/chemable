@@ -39,7 +39,10 @@ export interface DrawOptions {
     mousePos: { x: number, y: number };
     lassoPath?: {x: number, y: number}[]; 
     selectedAtomIds?: Set<number>;
-    fontSize?: number;        
+    fontSize?: number;
+    globalBondSpacing: number;
+    globalFontFamily: string;
+    globalColor: string;        
 }
 
 function getNeighborCoords(
@@ -141,10 +144,12 @@ export function drawScene(
 
         const nx = -dy / len;
         const ny = dx / len;
-        let offset = 5;
+
+        ctx.strokeStyle = bond.color || options.globalColor;
+        let offset = bond.spacing || options.globalBondSpacing;
 
         if (bond.type === 2 || bond.type === 3) {
-            // Wir lassen 'neighbors' weg und übergeben direkt 'bonds' und 'atoms'
+            // Wir übergeben direkt 'bonds' und 'atoms'
             const direction = calculateBondOffsetDirection(a1, a2, bonds, atoms);
             offset = offset * direction; 
         }
@@ -155,17 +160,36 @@ export function drawScene(
             ctx.lineTo(a2.x, a2.y);
             ctx.stroke(); 
         } else if (bond.type === 2) {
-            ctx.moveTo(a1.x, a1.y);
-            ctx.lineTo(a2.x, a2.y);
-            const shiftX = nx * offset;
-            const shiftY = ny * offset;
-            const ux = dx / len;
-            const uy = dy / len;
-            const padding = 3; 
-            ctx.moveTo(a1.x + shiftX + ux * padding, a1.y + shiftY + uy * padding);
-            ctx.lineTo(a2.x + shiftX - ux * padding, a2.y + shiftY - uy * padding);
-            ctx.stroke(); 
-        } else if (bond.type === 3) {
+            // Zähle die Verbindungen der beiden beteiligten Atome
+            const a1Connections = bonds.filter(b => b.id1 === a1.id || b.id2 === a1.id).length;
+            const a2Connections = bonds.filter(b => b.id1 === a2.id || b.id2 === a2.id).length;
+            const isTerminal = a1Connections === 1 || a2Connections === 1;
+
+            if (isTerminal) {
+                // Zentrierte Doppelbindung (beide Linien gleich lang und symmetrisch versetzt)
+                const halfOffset = offset / 2;
+                
+                // Linie 1
+                ctx.moveTo(a1.x + nx * halfOffset, a1.y + ny * halfOffset);
+                ctx.lineTo(a2.x + nx * halfOffset, a2.y + ny * halfOffset);
+                
+                // Linie 2
+                ctx.moveTo(a1.x - nx * halfOffset, a1.y - ny * halfOffset);
+                ctx.lineTo(a2.x - nx * halfOffset, a2.y - ny * halfOffset);
+                ctx.stroke();
+            } else {
+                // Asymmetrische Doppelbindung für Ringe / Ketten
+                ctx.moveTo(a1.x, a1.y);
+                ctx.lineTo(a2.x, a2.y);
+                const shiftX = nx * offset;
+                const shiftY = ny * offset;
+                const ux = dx / len;
+                const uy = dy / len;
+                const padding = 3; 
+                ctx.moveTo(a1.x + shiftX + ux * padding, a1.y + shiftY + uy * padding);
+                ctx.lineTo(a2.x + shiftX - ux * padding, a2.y + shiftY - uy * padding);
+                ctx.stroke(); }
+            } else if (bond.type === 3) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             const o = 4; 
@@ -174,6 +198,7 @@ export function drawScene(
             ctx.moveTo(a1.x - nx * o, a1.y - ny * o);
             ctx.lineTo(a2.x - nx * o, a2.y - ny * o);
             ctx.stroke(); 
+
         } else if (bond.type === 4) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -187,6 +212,7 @@ export function drawScene(
             ctx.moveTo(a2.x, a2.y);
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
+
         } else if (bond.type === 5) {
             // --- KEIL (Wedge) ---
             const startWidth = 1.0; // Startet auf der Breite der normalen Linie (2px)
@@ -213,7 +239,7 @@ export function drawScene(
             ctx.fill();
 
         } else if (bond.type === 6) {
-            // --- VERBESSERTER GESTRICHELTER KEIL (Dash) ---
+            // --- GESTRICHELTER KEIL (Dash) ---
             const hashes = 6; // Etwas weniger Striche für mehr Abstand
             const startGap = 4.0; // Abstand zum Start-Atom
             const endGap = 2.0;   // Abstand zum Ziel-Atom
@@ -245,7 +271,8 @@ export function drawScene(
     for (const atom of atoms) {
         // 1. Pfeil-Anker ignorieren (DUMMY)
         if (atom.element.toUpperCase() === "DUMMY") continue; 
-
+        const fontToUse = atom.fontFamily || options.globalFontFamily;
+        ctx.font = `bold ${options.fontSize || 16}px ${fontToUse}`;
         // 2. Reine Freitext-Elemente zeichnen
         if (atom.element === "TEXT") {
             const txt = parseChemicalRichText(atom.customLabel || "");
@@ -253,7 +280,7 @@ export function drawScene(
             ctx.fillText(txt, atom.x, atom.y);
             continue; 
         }
-
+        
         // 3. Normale Atome (und überschriebene Atom-Labels)
         const bondOnRight = isBondOnRightSide(atom, bonds, atoms);
         
@@ -309,9 +336,9 @@ export function drawScene(
 
         // Atom-/Text-Label zeichnen
         if (!isHidden) {
-            ctx.fillStyle = "#000000";
-            ctx.fillText(label, drawX, atom.y);
-        }
+        ctx.fillStyle = atom.color || options.globalColor;
+        ctx.fillText(label, drawX, atom.y);
+    }
     }
 
     // --- VORSCHAU ---

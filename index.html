@@ -74,6 +74,7 @@
         <button id="btn-select" title="Lasso Auswahl (L)"> Lasso</button>
         <button id="btn-text" title="Freitext (T)">Abc Text</button>
         <button id="btn-arrow" title="Reaktionspfeil (A)">➔ Pfeil</button>
+        <button id="btn-style-menu" title="Dokument- & Auswahl-Styles"> Styles</button>
         
         <span style="border-left: 1px solid #ccc; height: 24px; margin: 0 5px;"></span>
         
@@ -127,6 +128,34 @@
     </div>
     
     <input type="file" id="file-load" style="display: none;" accept=".chem,.svg">
+    <div id="style-panel" style="display: none; position: absolute; top: 60px; right: 20px; background: #ffffff; border: 1px solid #ccc; border-radius: 8px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); z-index: 1000; width: 220px; font-family: sans-serif;">
+    <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🎨 Eigenschaften</h3>
+    
+    <div style="margin-bottom: 15px;">
+        <label for="color-picker" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Farbe (Lokal/Global):</label>
+        <input type="color" id="color-picker" value="#000000" style="width: 100%; height: 35px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; padding: 2px;">
+    </div>
+
+    <div style="margin-bottom: 15px;">
+        <label for="bond-spacing-slider" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">
+            Abstand Linien: <span id="bond-spacing-val" style="font-weight: normal;">5</span>px
+        </label>
+        <input type="range" id="bond-spacing-slider" min="2" max="12" value="5" style="width: 100%;">
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <label for="font-family-select" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Schriftart:</label>
+        <select id="font-family-select" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+        </select>
+    </div>
+    
+    <button id="btn-close-style-panel" style="width: 100%; padding: 8px; background: #eeeeee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold;">Schließen</button>
+    </div>
 
     <script>
       require('./dist/renderer.js');
