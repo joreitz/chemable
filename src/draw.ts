@@ -131,8 +131,26 @@ export function drawScene(
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#000000";
     ctx.setLineDash([]); 
+    
+    // NEU: 
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-    for (const bond of bonds) {
+    // NEU: Wir sortieren die Bindungen vor dem Zeichnen.
+    // Schwarze Bindungen kommen zuerst, alle anderen Farben danach (liegen also drüber).
+    const sortedBonds = [...bonds].sort((a, b) => {
+        const colorA = a.color || options.globalColor;
+        const colorB = b.color || options.globalColor;
+        
+        const isBlackA = colorA === "#000000" || colorA.toLowerCase() === "#000";
+        const isBlackB = colorB === "#000000" || colorB.toLowerCase() === "#000";
+        
+        if (isBlackA && !isBlackB) return -1; // A (schwarz) vor B (farbig)
+        if (!isBlackA && isBlackB) return 1;  // B (schwarz) vor A (farbig)
+        return 0;
+    });
+
+    for (const bond of sortedBonds) {
         const a1 = atoms.find(a => a.id === bond.id1);
         const a2 = atoms.find(a => a.id === bond.id2);
         if (!a1 || !a2) continue;
@@ -203,7 +221,7 @@ export function drawScene(
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             ctx.stroke();
-
+            ctx.fillStyle = bond.color || options.globalColor; 
             const headlen = 12;
             const angle = Math.atan2(dy, dx);
             ctx.beginPath();
@@ -244,7 +262,7 @@ export function drawScene(
             const startGap = 4.0; // Abstand zum Start-Atom
             const endGap = 2.0;   // Abstand zum Ziel-Atom
             const effectiveLen = len - startGap - endGap;
-
+            ctx.fillStyle = bond.color || options.globalColor; 
             ctx.beginPath();
             for (let i = 0; i < hashes; i++) {
                 const step = startGap + (i / (hashes - 1)) * effectiveLen;

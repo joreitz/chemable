@@ -1114,28 +1114,25 @@ document.getElementById('btn-close-style-panel')?.addEventListener('click', () =
     if (stylePanel) stylePanel.style.display = 'none';
 });
 
-// --- LOKALE SPEICHER-BLOCKER FÜR SLIDER/PICKER ---
+// Blocker, damit Undo beim Schieben des Sliders nicht tausende Speicherstände macht
 let preStyleStateSaved = false;
-
-// Wenn man die Maus loslässt (change), setzen wir den Blocker zurück
 colorPicker?.addEventListener('change', () => { preStyleStateSaved = false; });
 spacingSlider?.addEventListener('change', () => { preStyleStateSaved = false; });
 
-// Farbe ändern (Live-Vorschau)
+// Farbe ändern
 colorPicker?.addEventListener('input', () => {
     const newColor = colorPicker.value;
     const selectedIds = state.getSelectedAtomIds();
     
+    if (!preStyleStateSaved) { state.saveState(); preStyleStateSaved = true; }
+    
     if (selectedIds.size > 0) {
-        // NUR 1x Speichern, wenn der Drag beginnt!
-        if (!preStyleStateSaved) { 
-            state.saveState(); 
-            preStyleStateSaved = true; 
-        }
-        
+        // Atome färben
         state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.color = newColor; });
+        
+        // WICHTIG: && statt || verwenden! Nur Bindungen färben, die KOMPLETT im Lasso liegen
         state.getBonds().forEach(b => { 
-            if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.color = newColor; 
+            if (selectedIds.has(b.id1) && selectedIds.has(b.id2)) b.color = newColor; 
         });
     } else {
         globalColor = newColor; 
@@ -1143,19 +1140,18 @@ colorPicker?.addEventListener('input', () => {
     render();
 });
 
-// Abstand der Doppelbindung ändern (Live-Vorschau)
+// Abstand der Doppelbindung ändern
 spacingSlider?.addEventListener('input', () => {
     const newSpacing = parseFloat(spacingSlider.value);
     if (spacingVal) spacingVal.innerText = newSpacing.toString();
     const selectedIds = state.getSelectedAtomIds();
     
+    if (!preStyleStateSaved) { state.saveState(); preStyleStateSaved = true; }
+    
     if (selectedIds.size > 0) {
-        if (!preStyleStateSaved) { 
-            state.saveState(); 
-            preStyleStateSaved = true; 
-        }
         state.getBonds().forEach(b => {
-            if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.spacing = newSpacing;
+            // WICHTIG: Auch hier && statt || verwenden!
+            if (selectedIds.has(b.id1) && selectedIds.has(b.id2)) b.spacing = newSpacing;
         });
     } else {
         globalBondSpacing = newSpacing;
@@ -1168,8 +1164,8 @@ fontSelect?.addEventListener('change', () => {
     const newFont = fontSelect.value;
     const selectedIds = state.getSelectedAtomIds();
     
+    state.saveState();
     if (selectedIds.size > 0) {
-        state.saveState();
         state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.fontFamily = newFont; });
     } else {
         globalFontFamily = newFont;
