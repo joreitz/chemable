@@ -1,5 +1,5 @@
 {
-  "H": {
+  "H":{
     "atomicNumber": 1,
     "elementSymbol": "H",
     "name": "Hydrogen",
@@ -12,30 +12,33 @@
     ],
     "colorValue": "#FFFFFF"
   },
-  "He": {
+  "He":{
     "atomicNumber": 2,
     "elementSymbol": "He",
     "name": "Helium",
     "covSingleBondRadius": 46,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
     "electronegativity": 0,
     "valency": [
       0
     ],
     "colorValue": "#D9FFFF"
   },
-  "Li": {
+  "Li":{
     "atomicNumber": 3,
     "elementSymbol": "Li",
     "name": "Lithium",
     "covSingleBondRadius": 133,
     "covDoubleBondRadius": 124,
+    "covTripleBondRadius": "",
     "electronegativity": 0.98,
     "valency": [
       1
     ],
     "colorValue": "#CC80FF"
   },
-  "Be": {
+  "Be":{
     "atomicNumber": 4,
     "elementSymbol": "Be",
     "name": "Beryllium",
@@ -48,7 +51,7 @@
     ],
     "colorValue": "#C2FF00"
   },
-  "B": {
+  "B":{
     "atomicNumber": 5,
     "elementSymbol": "B",
     "name": "Boron",
@@ -61,7 +64,7 @@
     ],
     "colorValue": "#FFB5B5"
   },
-  "C": {
+  "C":{
     "atomicNumber": 6,
     "elementSymbol": "C",
     "name": "Carbon",
@@ -74,7 +77,7 @@
     ],
     "colorValue": "#909090"
   },
-  "N": {
+  "N":{
     "atomicNumber": 7,
     "elementSymbol": "N",
     "name": "Nitrogen",
@@ -83,11 +86,12 @@
     "covTripleBondRadius": 54,
     "electronegativity": 3.04,
     "valency": [
-      3
+      3,
+      4
     ],
     "colorValue": "#3050F8"
   },
-  "O": {
+  "O":{
     "atomicNumber": 8,
     "elementSymbol": "O",
     "name": "Oxygen",
@@ -100,7 +104,7 @@
     ],
     "colorValue": "#FF0D0D"
   },
-  "F": {
+  "F":{
     "atomicNumber": 9,
     "elementSymbol": "F",
     "name": "Fluorine",
@@ -113,31 +117,33 @@
     ],
     "colorValue": "#90E050"
   },
-  "Ne": {
+  "Ne":{
     "atomicNumber": 10,
     "elementSymbol": "Ne",
     "name": "Neon",
     "covSingleBondRadius": 67,
     "covDoubleBondRadius": 96,
+    "covTripleBondRadius": "",
     "electronegativity": 0,
     "valency": [
       0
     ],
     "colorValue": "#B3E3F5"
   },
-  "Na": {
+  "Na":{
     "atomicNumber": 11,
     "elementSymbol": "Na",
     "name": "Sodium",
     "covSingleBondRadius": 155,
     "covDoubleBondRadius": 160,
+    "covTripleBondRadius": "",
     "electronegativity": 0.93,
     "valency": [
       1
     ],
     "colorValue": "#AB5CF2"
   },
-  "Mg": {
+  "Mg":{
     "atomicNumber": 12,
     "elementSymbol": "Mg",
     "name": "Magnesium",
@@ -150,7 +156,7 @@
     ],
     "colorValue": "#8AFF00"
   },
-  "Al": {
+  "Al":{
     "atomicNumber": 13,
     "elementSymbol": "Al",
     "name": "Aluminium",
@@ -163,7 +169,7 @@
     ],
     "colorValue": "#BFA6A6"
   },
-  "Si": {
+  "Si":{
     "atomicNumber": 14,
     "elementSymbol": "Si",
     "name": "Silicon",
@@ -176,7 +182,7 @@
     ],
     "colorValue": "#F0C8A0"
   },
-  "P": {
+  "P":{
     "atomicNumber": 15,
     "elementSymbol": "P",
     "name": "Phosphorus",
@@ -190,7 +196,7 @@
     ],
     "colorValue": "#FF8000"
   },
-  "S": {
+  "S":{
     "atomicNumber": 16,
     "elementSymbol": "S",
     "name": "Sulfur",
@@ -199,11 +205,13 @@
     "covTripleBondRadius": 95,
     "electronegativity": 2.58,
     "valency": [
-      2
+      2,
+      4,
+      6
     ],
     "colorValue": "#FFFF30"
   },
-  "Cl": {
+  "Cl":{
     "atomicNumber": 17,
     "elementSymbol": "Cl",
     "name": "Chlorine",
@@ -216,19 +224,33 @@
     ],
     "colorValue": "#1FF01F"
   },
-  "K": {
+  "Ar":{
+    "atomicNumber": 18,
+    "elementSymbol": "Ar",
+    "name": "Argon",
+    "covSingleBondRadius": 96,
+    "covDoubleBondRadius": 107,
+    "covTripleBondRadius": 96,
+    "electronegativity": 0,
+    "valency": [
+      0
+    ],
+    "colorValue": ""
+  },
+  "K":{
     "atomicNumber": 19,
     "elementSymbol": "K",
     "name": "Potassium",
     "covSingleBondRadius": 196,
     "covDoubleBondRadius": 193,
+    "covTripleBondRadius": "",
     "electronegativity": 0.82,
     "valency": [
       1
     ],
     "colorValue": "#8F40D4"
   },
-  "Ca": {
+  "Ca":{
     "atomicNumber": 20,
     "elementSymbol": "Ca",
     "name": "Calcium",
@@ -241,7 +263,81 @@
     ],
     "colorValue": "#3DFF00"
   },
-  "Fe": {
+  "Sc":{
+    "atomicNumber": 21,
+    "elementSymbol": "Sc",
+    "name": "Scandium",
+    "covSingleBondRadius": 148,
+    "covDoubleBondRadius": 116,
+    "covTripleBondRadius": 114,
+    "electronegativity": 1.36,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Ti":{
+    "atomicNumber": 22,
+    "elementSymbol": "Ti",
+    "name": "Titanium",
+    "covSingleBondRadius": 136,
+    "covDoubleBondRadius": 117,
+    "covTripleBondRadius": 108,
+    "electronegativity": 1.54,
+    "valency": [
+      2,
+      3,
+      4
+    ],
+    "colorValue": ""
+  },
+  "V":{
+    "atomicNumber": 23,
+    "elementSymbol": "V",
+    "name": "Vanadium",
+    "covSingleBondRadius": 134,
+    "covDoubleBondRadius": 112,
+    "covTripleBondRadius": 106,
+    "electronegativity": 1.63,
+    "valency": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "colorValue": ""
+  },
+  "Cr":{
+    "atomicNumber": 24,
+    "elementSymbol": "Cr",
+    "name": "Chromium",
+    "covSingleBondRadius": 122,
+    "covDoubleBondRadius": 111,
+    "covTripleBondRadius": 103,
+    "electronegativity": 1.66,
+    "valency": [
+      2,
+      3,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Mn":{
+    "atomicNumber": 25,
+    "elementSymbol": "Mn",
+    "name": "Manganese",
+    "covSingleBondRadius": 119,
+    "covDoubleBondRadius": 105,
+    "covTripleBondRadius": 103,
+    "electronegativity": 1.55,
+    "valency": [
+      2,
+      4,
+      7
+    ],
+    "colorValue": ""
+  },
+  "Fe":{
     "atomicNumber": 26,
     "elementSymbol": "Fe",
     "name": "Iron",
@@ -256,12 +352,40 @@
     ],
     "colorValue": "#E06633"
   },
-  "Cu": {
+  "Co":{
+    "atomicNumber": 27,
+    "elementSymbol": "Co",
+    "name": "Cobalt",
+    "covSingleBondRadius": 111,
+    "covDoubleBondRadius": 103,
+    "covTripleBondRadius": 96,
+    "electronegativity": 1.88,
+    "valency": [
+      2,
+      3
+    ],
+    "colorValue": ""
+  },
+  "Ni":{
+    "atomicNumber": 28,
+    "elementSymbol": "Ni",
+    "name": "Nickel",
+    "covSingleBondRadius": 110,
+    "covDoubleBondRadius": 101,
+    "covTripleBondRadius": 101,
+    "electronegativity": 1.91,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "Cu":{
     "atomicNumber": 29,
     "elementSymbol": "Cu",
     "name": "Copper",
     "covSingleBondRadius": 112,
     "covDoubleBondRadius": 115,
+    "covTripleBondRadius": 120,
     "electronegativity": 1.9,
     "valency": [
       1,
@@ -269,7 +393,76 @@
     ],
     "colorValue": "#C88033"
   },
-  "Br": {
+  "Zn":{
+    "atomicNumber": 30,
+    "elementSymbol": "Zn",
+    "name": "Zinc",
+    "covSingleBondRadius": 118,
+    "covDoubleBondRadius": 120,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.65,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "Ga":{
+    "atomicNumber": 31,
+    "elementSymbol": "Ga",
+    "name": "Gallium",
+    "covSingleBondRadius": 124,
+    "covDoubleBondRadius": 117,
+    "covTripleBondRadius": 121,
+    "electronegativity": 1.81,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Ge":{
+    "atomicNumber": 32,
+    "elementSymbol": "Ge",
+    "name": "Germanium",
+    "covSingleBondRadius": 121,
+    "covDoubleBondRadius": 111,
+    "covTripleBondRadius": 114,
+    "electronegativity": 2.01,
+    "valency": [
+      2,
+      4
+    ],
+    "colorValue": ""
+  },
+  "As":{
+    "atomicNumber": 33,
+    "elementSymbol": "As",
+    "name": "Arsenic",
+    "covSingleBondRadius": 121,
+    "covDoubleBondRadius": 114,
+    "covTripleBondRadius": 106,
+    "electronegativity": 2.18,
+    "valency": [
+      3,
+      5
+    ],
+    "colorValue": ""
+  },
+  "Se":{
+    "atomicNumber": 34,
+    "elementSymbol": "Se",
+    "name": "Selenium",
+    "covSingleBondRadius": 116,
+    "covDoubleBondRadius": 107,
+    "covTripleBondRadius": 107,
+    "electronegativity": 2.55,
+    "valency": [
+      2,
+      4,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Br":{
     "atomicNumber": 35,
     "elementSymbol": "Br",
     "name": "Bromine",
@@ -278,16 +471,246 @@
     "covTripleBondRadius": 110,
     "electronegativity": 2.96,
     "valency": [
-      1
+      1,
+      5
     ],
     "colorValue": "#A62929"
   },
-  "I": {
+  "Kr":{
+    "atomicNumber": 36,
+    "elementSymbol": "Kr",
+    "name": "Krypton",
+    "covSingleBondRadius": 117,
+    "covDoubleBondRadius": 121,
+    "covTripleBondRadius": 108,
+    "electronegativity": 3,
+    "valency": [
+      0
+    ],
+    "colorValue": ""
+  },
+  "Rb":{
+    "atomicNumber": 37,
+    "elementSymbol": "Rb",
+    "name": "Rubidium",
+    "covSingleBondRadius": 210,
+    "covDoubleBondRadius": 202,
+    "covTripleBondRadius": "",
+    "electronegativity": 0.82,
+    "valency": [
+      1
+    ],
+    "colorValue": ""
+  },
+  "Sr":{
+    "atomicNumber": 38,
+    "elementSymbol": "Sr",
+    "name": "Strontium",
+    "covSingleBondRadius": 185,
+    "covDoubleBondRadius": 157,
+    "covTripleBondRadius": 139,
+    "electronegativity": 0.95,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "Y":{
+    "atomicNumber": 39,
+    "elementSymbol": "Y",
+    "name": "Yttrium",
+    "covSingleBondRadius": 163,
+    "covDoubleBondRadius": 130,
+    "covTripleBondRadius": 124,
+    "electronegativity": 1.22,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Zr":{
+    "atomicNumber": 40,
+    "elementSymbol": "Zr",
+    "name": "Zirconium",
+    "covSingleBondRadius": 154,
+    "covDoubleBondRadius": 121,
+    "covTripleBondRadius": 121,
+    "electronegativity": 1.33,
+    "valency": [
+      4
+    ],
+    "colorValue": ""
+  },
+  "Nb":{
+    "atomicNumber": 41,
+    "elementSymbol": "Nb",
+    "name": "Niobium",
+    "covSingleBondRadius": 147,
+    "covDoubleBondRadius": 116,
+    "covTripleBondRadius": 116,
+    "electronegativity": 1.6,
+    "valency": [
+      5
+    ],
+    "colorValue": ""
+  },
+  "Mo":{
+    "atomicNumber": 42,
+    "elementSymbol": "Mo",
+    "name": "Molybdenum",
+    "covSingleBondRadius": 138,
+    "covDoubleBondRadius": 113,
+    "covTripleBondRadius": 113,
+    "electronegativity": 2.16,
+    "valency": [
+      3,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Tc":{
+    "atomicNumber": 43,
+    "elementSymbol": "Tc",
+    "name": "Technetium",
+    "covSingleBondRadius": 128,
+    "covDoubleBondRadius": 110,
+    "covTripleBondRadius": 110,
+    "electronegativity": 1.9,
+    "valency": [
+      6
+    ],
+    "colorValue": ""
+  },
+  "Ru":{
+    "atomicNumber": 44,
+    "elementSymbol": "Ru",
+    "name": "Ruthenium",
+    "covSingleBondRadius": 125,
+    "covDoubleBondRadius": 103,
+    "covTripleBondRadius": 103,
+    "electronegativity": 2.2,
+    "valency": [
+      3,
+      4,
+      8
+    ],
+    "colorValue": ""
+  },
+  "Rh":{
+    "atomicNumber": 45,
+    "elementSymbol": "Rh",
+    "name": "Rhodium",
+    "covSingleBondRadius": 125,
+    "covDoubleBondRadius": 110,
+    "covTripleBondRadius": 106,
+    "electronegativity": 2.28,
+    "valency": [
+      4
+    ],
+    "colorValue": ""
+  },
+  "Pd":{
+    "atomicNumber": 46,
+    "elementSymbol": "Pd",
+    "name": "Palladium",
+    "covSingleBondRadius": 120,
+    "covDoubleBondRadius": 117,
+    "covTripleBondRadius": 112,
+    "electronegativity": 2.2,
+    "valency": [
+      2,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Ag":{
+    "atomicNumber": 47,
+    "elementSymbol": "Ag",
+    "name": "Silver",
+    "covSingleBondRadius": 128,
+    "covDoubleBondRadius": 139,
+    "covTripleBondRadius": 137,
+    "electronegativity": 1.93,
+    "valency": [
+      1
+    ],
+    "colorValue": ""
+  },
+  "Cd":{
+    "atomicNumber": 48,
+    "elementSymbol": "Cd",
+    "name": "Cadmium",
+    "covSingleBondRadius": 136,
+    "covDoubleBondRadius": 144,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.69,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "In":{
+    "atomicNumber": 49,
+    "elementSymbol": "In",
+    "name": "Indium",
+    "covSingleBondRadius": 142,
+    "covDoubleBondRadius": 136,
+    "covTripleBondRadius": 146,
+    "electronegativity": 1.78,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Sn":{
+    "atomicNumber": 50,
+    "elementSymbol": "Sn",
+    "name": "Tin",
+    "covSingleBondRadius": 140,
+    "covDoubleBondRadius": 130,
+    "covTripleBondRadius": 132,
+    "electronegativity": 1.96,
+    "valency": [
+      2,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Sb":{
+    "atomicNumber": 51,
+    "elementSymbol": "Sb",
+    "name": "Antimony",
+    "covSingleBondRadius": 140,
+    "covDoubleBondRadius": 133,
+    "covTripleBondRadius": 127,
+    "electronegativity": 2.05,
+    "valency": [
+      3,
+      5
+    ],
+    "colorValue": ""
+  },
+  "Te":{
+    "atomicNumber": 52,
+    "elementSymbol": "Te",
+    "name": "Tellurium",
+    "covSingleBondRadius": 136,
+    "covDoubleBondRadius": 128,
+    "covTripleBondRadius": 121,
+    "electronegativity": 2.1,
+    "valency": [
+      2,
+      4,
+      6
+    ],
+    "colorValue": ""
+  },
+  "I":{
     "atomicNumber": 53,
     "elementSymbol": "I",
     "name": "Iodine",
     "covSingleBondRadius": 133,
-    "covDoubleBondRadius": 127,
+    "covDoubleBondRadius": 129,
     "covTripleBondRadius": 125,
     "electronegativity": 2.66,
     "valency": [
@@ -298,18 +721,816 @@
     ],
     "colorValue": "#940094"
   },
-  "Au": {
+  "Xe":{
+    "atomicNumber": 54,
+    "elementSymbol": "Xe",
+    "name": "Xenon",
+    "covSingleBondRadius": 131,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": 122,
+    "electronegativity": 2.6,
+    "valency": [
+      0
+    ],
+    "colorValue": ""
+  },
+  "Cs":{
+    "atomicNumber": 55,
+    "elementSymbol": "Cs",
+    "name": "Cesium",
+    "covSingleBondRadius": 232,
+    "covDoubleBondRadius": 209,
+    "covTripleBondRadius": "",
+    "electronegativity": 0.79,
+    "valency": [
+      1
+    ],
+    "colorValue": ""
+  },
+  "Ba":{
+    "atomicNumber": 56,
+    "elementSymbol": "Ba",
+    "name": "Barium",
+    "covSingleBondRadius": 196,
+    "covDoubleBondRadius": 161,
+    "covTripleBondRadius": 149,
+    "electronegativity": 0.89,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "La":{
+    "atomicNumber": 57,
+    "elementSymbol": "La",
+    "name": "Lanthanum",
+    "covSingleBondRadius": 180,
+    "covDoubleBondRadius": 139,
+    "covTripleBondRadius": 139,
+    "electronegativity": 1.1,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Ce":{
+    "atomicNumber": 58,
+    "elementSymbol": "Ce",
+    "name": "Cerium",
+    "covSingleBondRadius": 163,
+    "covDoubleBondRadius": 137,
+    "covTripleBondRadius": 131,
+    "electronegativity": 1.12,
+    "valency": [
+      3,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Pr":{
+    "atomicNumber": 59,
+    "elementSymbol": "Pr",
+    "name": "Praseodymium",
+    "covSingleBondRadius": 176,
+    "covDoubleBondRadius": 138,
+    "covTripleBondRadius": 128,
+    "electronegativity": 1.13,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Nd":{
+    "atomicNumber": 60,
+    "elementSymbol": "Nd",
+    "name": "Neodymium",
+    "covSingleBondRadius": 174,
+    "covDoubleBondRadius": 137,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.14,
+    "valency": [
+      3,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Pm":{
+    "atomicNumber": 61,
+    "elementSymbol": "Pm",
+    "name": "Promethium",
+    "covSingleBondRadius": 173,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.13,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Sm":{
+    "atomicNumber": 62,
+    "elementSymbol": "Sm",
+    "name": "Samarium",
+    "covSingleBondRadius": 172,
+    "covDoubleBondRadius": 134,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.17,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Eu":{
+    "atomicNumber": 63,
+    "elementSymbol": "Eu",
+    "name": "Europium",
+    "covSingleBondRadius": 168,
+    "covDoubleBondRadius": 134,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.2,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Gd":{
+    "atomicNumber": 64,
+    "elementSymbol": "Gd",
+    "name": "Gadolinium",
+    "covSingleBondRadius": 169,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": 132,
+    "electronegativity": 1.2,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Tb":{
+    "atomicNumber": 65,
+    "elementSymbol": "Tb",
+    "name": "Terbium",
+    "covSingleBondRadius": 168,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.2,
+    "valency": [
+      3,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Dy":{
+    "atomicNumber": 66,
+    "elementSymbol": "Dy",
+    "name": "Dysprosium",
+    "covSingleBondRadius": 167,
+    "covDoubleBondRadius": 133,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.22,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Ho":{
+    "atomicNumber": 67,
+    "elementSymbol": "Ho",
+    "name": "Holmium",
+    "covSingleBondRadius": 166,
+    "covDoubleBondRadius": 133,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.23,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Er":{
+    "atomicNumber": 68,
+    "elementSymbol": "Er",
+    "name": "Erbium",
+    "covSingleBondRadius": 165,
+    "covDoubleBondRadius": 133,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.24,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Tm":{
+    "atomicNumber": 69,
+    "elementSymbol": "Tm",
+    "name": "Thulium",
+    "covSingleBondRadius": 164,
+    "covDoubleBondRadius": 131,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.25,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Yb":{
+    "atomicNumber": 70,
+    "elementSymbol": "Yb",
+    "name": "Ytterbium",
+    "covSingleBondRadius": 170,
+    "covDoubleBondRadius": 129,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.1,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Lu":{
+    "atomicNumber": 71,
+    "elementSymbol": "Lu",
+    "name": "Lutetium",
+    "covSingleBondRadius": 162,
+    "covDoubleBondRadius": 131,
+    "covTripleBondRadius": 131,
+    "electronegativity": 1.27,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Hf":{
+    "atomicNumber": 72,
+    "elementSymbol": "Hf",
+    "name": "Hafnium",
+    "covSingleBondRadius": 152,
+    "covDoubleBondRadius": 122,
+    "covTripleBondRadius": 122,
+    "electronegativity": 1.3,
+    "valency": [
+      4
+    ],
+    "colorValue": ""
+  },
+  "Ta":{
+    "atomicNumber": 73,
+    "elementSymbol": "Ta",
+    "name": "Tantalum",
+    "covSingleBondRadius": 146,
+    "covDoubleBondRadius": 119,
+    "covTripleBondRadius": 119,
+    "electronegativity": 1.5,
+    "valency": [
+      5
+    ],
+    "colorValue": ""
+  },
+  "W":{
+    "atomicNumber": 74,
+    "elementSymbol": "W",
+    "name": "Tungsten",
+    "covSingleBondRadius": 137,
+    "covDoubleBondRadius": 115,
+    "covTripleBondRadius": 115,
+    "electronegativity": 2.36,
+    "valency": [
+      6
+    ],
+    "colorValue": ""
+  },
+  "Re":{
+    "atomicNumber": 75,
+    "elementSymbol": "Re",
+    "name": "Rhenium",
+    "covSingleBondRadius": 131,
+    "covDoubleBondRadius": 110,
+    "covTripleBondRadius": 110,
+    "electronegativity": 1.9,
+    "valency": [
+      2,
+      4,
+      6,
+      7
+    ],
+    "colorValue": ""
+  },
+  "Os":{
+    "atomicNumber": 76,
+    "elementSymbol": "Os",
+    "name": "Osmium",
+    "covSingleBondRadius": 129,
+    "covDoubleBondRadius": 109,
+    "covTripleBondRadius": 109,
+    "electronegativity": 2.2,
+    "valency": [
+      3,
+      4,
+      6,
+      8
+    ],
+    "colorValue": ""
+  },
+  "Ir":{
+    "atomicNumber": 77,
+    "elementSymbol": "Ir",
+    "name": "Iridium",
+    "covSingleBondRadius": 122,
+    "covDoubleBondRadius": 115,
+    "covTripleBondRadius": 107,
+    "electronegativity": 2.2,
+    "valency": [
+      3,
+      4,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Pt":{
+    "atomicNumber": 78,
+    "elementSymbol": "Pt",
+    "name": "Platinum",
+    "covSingleBondRadius": 123,
+    "covDoubleBondRadius": 112,
+    "covTripleBondRadius": 110,
+    "electronegativity": 2.28,
+    "valency": [
+      2,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Au":{
     "atomicNumber": 79,
     "elementSymbol": "Au",
     "name": "Gold",
     "covSingleBondRadius": 124,
     "covDoubleBondRadius": 121,
-    "covTripleBondRadius": 114,
+    "covTripleBondRadius": 123,
     "electronegativity": 2.54,
     "valency": [
       1,
       3
     ],
     "colorValue": "#FFD123"
+  },
+  "Hg":{
+    "atomicNumber": 80,
+    "elementSymbol": "Hg",
+    "name": "Mercury",
+    "covSingleBondRadius": 133,
+    "covDoubleBondRadius": 142,
+    "covTripleBondRadius": "",
+    "electronegativity": 2,
+    "valency": [
+      1,
+      2
+    ],
+    "colorValue": ""
+  },
+  "Tl":{
+    "atomicNumber": 81,
+    "elementSymbol": "Tl",
+    "name": "Thallium",
+    "covSingleBondRadius": 144,
+    "covDoubleBondRadius": 142,
+    "covTripleBondRadius": 150,
+    "electronegativity": 1.62,
+    "valency": [
+      1,
+      3
+    ],
+    "colorValue": ""
+  },
+  "Pb":{
+    "atomicNumber": 82,
+    "elementSymbol": "Pb",
+    "name": "Lead",
+    "covSingleBondRadius": 144,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": 137,
+    "electronegativity": 1.87,
+    "valency": [
+      2,
+      4
+    ],
+    "colorValue": ""
+  },
+  "Bi":{
+    "atomicNumber": 83,
+    "elementSymbol": "Bi",
+    "name": "Bismuth",
+    "covSingleBondRadius": 151,
+    "covDoubleBondRadius": 141,
+    "covTripleBondRadius": 135,
+    "electronegativity": 2.02,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Po":{
+    "atomicNumber": 84,
+    "elementSymbol": "Po",
+    "name": "Polonium",
+    "covSingleBondRadius": 145,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": 129,
+    "electronegativity": 2,
+    "valency": [
+      2,
+      4
+    ],
+    "colorValue": ""
+  },
+  "At":{
+    "atomicNumber": 85,
+    "elementSymbol": "At",
+    "name": "Astatine",
+    "covSingleBondRadius": 147,
+    "covDoubleBondRadius": 138,
+    "covTripleBondRadius": 138,
+    "electronegativity": 2.2,
+    "valency": [
+      1
+    ],
+    "colorValue": ""
+  },
+  "Rn":{
+    "atomicNumber": 86,
+    "elementSymbol": "Rn",
+    "name": "Radon",
+    "covSingleBondRadius": 142,
+    "covDoubleBondRadius": 145,
+    "covTripleBondRadius": 133,
+    "electronegativity": 2.2,
+    "valency": [
+      0
+    ],
+    "colorValue": ""
+  },
+  "Fr":{
+    "atomicNumber": 87,
+    "elementSymbol": "Fr",
+    "name": "Francium",
+    "covSingleBondRadius": 223,
+    "covDoubleBondRadius": 218,
+    "covTripleBondRadius": "",
+    "electronegativity": 0.79,
+    "valency": [
+      1
+    ],
+    "colorValue": ""
+  },
+  "Ra":{
+    "atomicNumber": 88,
+    "elementSymbol": "Ra",
+    "name": "Radium",
+    "covSingleBondRadius": 201,
+    "covDoubleBondRadius": 173,
+    "covTripleBondRadius": 159,
+    "electronegativity": 0.9,
+    "valency": [
+      2
+    ],
+    "colorValue": ""
+  },
+  "Ac":{
+    "atomicNumber": 89,
+    "elementSymbol": "Ac",
+    "name": "Actinium",
+    "covSingleBondRadius": 186,
+    "covDoubleBondRadius": 153,
+    "covTripleBondRadius": 140,
+    "electronegativity": 1.1,
+    "valency": [
+      3
+    ],
+    "colorValue": ""
+  },
+  "Th":{
+    "atomicNumber": 90,
+    "elementSymbol": "Th",
+    "name": "Thorium",
+    "covSingleBondRadius": 175,
+    "covDoubleBondRadius": 143,
+    "covTripleBondRadius": 136,
+    "electronegativity": 1.3,
+    "valency": [
+      4
+    ],
+    "colorValue": ""
+  },
+  "Pa":{
+    "atomicNumber": 91,
+    "elementSymbol": "Pa",
+    "name": "Protactinium",
+    "covSingleBondRadius": 169,
+    "covDoubleBondRadius": 138,
+    "covTripleBondRadius": 129,
+    "electronegativity": 1.5,
+    "valency": [
+      5
+    ],
+    "colorValue": ""
+  },
+  "U":{
+    "atomicNumber": 92,
+    "elementSymbol": "U",
+    "name": "Uranium",
+    "covSingleBondRadius": 170,
+    "covDoubleBondRadius": 134,
+    "covTripleBondRadius": 118,
+    "electronegativity": 1.38,
+    "valency": [
+      3,
+      4,
+      6
+    ],
+    "colorValue": ""
+  },
+  "Np":{
+    "atomicNumber": 93,
+    "elementSymbol": "Np",
+    "name": "Neptunium",
+    "covSingleBondRadius": 171,
+    "covDoubleBondRadius": 136,
+    "covTripleBondRadius": 116,
+    "electronegativity": 1.36,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Pu":{
+    "atomicNumber": 94,
+    "elementSymbol": "Pu",
+    "name": "Plutonium",
+    "covSingleBondRadius": 172,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.28,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Am":{
+    "atomicNumber": 95,
+    "elementSymbol": "Am",
+    "name": "Americium",
+    "covSingleBondRadius": 166,
+    "covDoubleBondRadius": 135,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.13,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Cm":{
+    "atomicNumber": 96,
+    "elementSymbol": "Cm",
+    "name": "Curium",
+    "covSingleBondRadius": 166,
+    "covDoubleBondRadius": 136,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.28,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Bk":{
+    "atomicNumber": 97,
+    "elementSymbol": "Bk",
+    "name": "Berkelium",
+    "covSingleBondRadius": 168,
+    "covDoubleBondRadius": 139,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Cf":{
+    "atomicNumber": 98,
+    "elementSymbol": "Cf",
+    "name": "Californium",
+    "covSingleBondRadius": 168,
+    "covDoubleBondRadius": 140,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Es":{
+    "atomicNumber": 99,
+    "elementSymbol": "Es",
+    "name": "Einsteinium",
+    "covSingleBondRadius": 165,
+    "covDoubleBondRadius": 140,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Fm":{
+    "atomicNumber": 100,
+    "elementSymbol": "Fm",
+    "name": "Fermium",
+    "covSingleBondRadius": 167,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Md":{
+    "atomicNumber": 101,
+    "elementSymbol": "Md",
+    "name": "Mendelevium",
+    "covSingleBondRadius": 173,
+    "covDoubleBondRadius": 139,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "No":{
+    "atomicNumber": 102,
+    "elementSymbol": "No",
+    "name": "Nobelium",
+    "covSingleBondRadius": 176,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Lr":{
+    "atomicNumber": 103,
+    "elementSymbol": "Lr",
+    "name": "Lawrencium",
+    "covSingleBondRadius": 161,
+    "covDoubleBondRadius": 141,
+    "covTripleBondRadius": "",
+    "electronegativity": 1.3,
+    "valency": [],
+    "colorValue": ""
+  },
+  "Rf":{
+    "atomicNumber": 104,
+    "elementSymbol": "Rf",
+    "name": "Rutherfordium",
+    "covSingleBondRadius": 157,
+    "covDoubleBondRadius": 140,
+    "covTripleBondRadius": 131,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Db":{
+    "atomicNumber": 105,
+    "elementSymbol": "Db",
+    "name": "Dubnium",
+    "covSingleBondRadius": 149,
+    "covDoubleBondRadius": 136,
+    "covTripleBondRadius": 126,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Sg":{
+    "atomicNumber": 106,
+    "elementSymbol": "Sg",
+    "name": "Seaborgium",
+    "covSingleBondRadius": 143,
+    "covDoubleBondRadius": 128,
+    "covTripleBondRadius": 121,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Bh":{
+    "atomicNumber": 107,
+    "elementSymbol": "Bh",
+    "name": "Bohrium",
+    "covSingleBondRadius": 141,
+    "covDoubleBondRadius": 128,
+    "covTripleBondRadius": 119,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Hs":{
+    "atomicNumber": 108,
+    "elementSymbol": "Hs",
+    "name": "Hassium",
+    "covSingleBondRadius": 134,
+    "covDoubleBondRadius": 125,
+    "covTripleBondRadius": 118,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Mt":{
+    "atomicNumber": 109,
+    "elementSymbol": "Mt",
+    "name": "Meitnerium",
+    "covSingleBondRadius": 129,
+    "covDoubleBondRadius": 125,
+    "covTripleBondRadius": 113,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Ds":{
+    "atomicNumber": 110,
+    "elementSymbol": "Ds",
+    "name": "Barmstatium",
+    "covSingleBondRadius": 128,
+    "covDoubleBondRadius": 116,
+    "covTripleBondRadius": 112,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Rg":{
+    "atomicNumber": 111,
+    "elementSymbol": "Rg",
+    "name": "Roentgenium",
+    "covSingleBondRadius": 121,
+    "covDoubleBondRadius": 116,
+    "covTripleBondRadius": 118,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Cn":{
+    "atomicNumber": 112,
+    "elementSymbol": "Cn",
+    "name": "Copernicium",
+    "covSingleBondRadius": 122,
+    "covDoubleBondRadius": 137,
+    "covTripleBondRadius": 130,
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Nh":{
+    "atomicNumber": 113,
+    "elementSymbol": "Nh",
+    "name": "Nihonium",
+    "covSingleBondRadius": 136,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+ "Fl": {
+    "atomicNumber": 114,
+    "elementSymbol": "Fl",
+    "name": "Flerovium",
+    "covSingleBondRadius": 143,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Mc":{
+    "atomicNumber": 115,
+    "elementSymbol": "Mc",
+    "name": "Moscovium",
+    "covSingleBondRadius": 162,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Lv":{
+    "atomicNumber": 116,
+    "elementSymbol": "Lv",
+    "name": "Livermorium",
+    "covSingleBondRadius": 175,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Ts":{
+    "atomicNumber": 117,
+    "elementSymbol": "Ts",
+    "name": "Tenessine",
+    "covSingleBondRadius": 165,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
+  },
+  "Og":{
+    "atomicNumber": 118,
+    "elementSymbol": "Og",
+    "name": "Oganesson",
+    "covSingleBondRadius": 157,
+    "covDoubleBondRadius": "",
+    "covTripleBondRadius": "",
+    "electronegativity": "",
+    "valency": [],
+    "colorValue": ""
   }
 }

@@ -153,7 +153,7 @@ export function drawScene(
         if (bond.type === 1) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
-            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
+            ctx.stroke(); 
         } else if (bond.type === 2) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -164,7 +164,7 @@ export function drawScene(
             const padding = 3; 
             ctx.moveTo(a1.x + shiftX + ux * padding, a1.y + shiftY + uy * padding);
             ctx.lineTo(a2.x + shiftX - ux * padding, a2.y + shiftY - uy * padding);
-            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
+            ctx.stroke(); 
         } else if (bond.type === 3) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -173,7 +173,7 @@ export function drawScene(
             ctx.lineTo(a2.x + nx * o, a2.y + ny * o);
             ctx.moveTo(a1.x - nx * o, a1.y - ny * o);
             ctx.lineTo(a2.x - nx * o, a2.y - ny * o);
-            ctx.stroke(); // <--- DAS HATTE GEFEHLT!
+            ctx.stroke(); 
         } else if (bond.type === 4) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
@@ -188,7 +188,7 @@ export function drawScene(
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
         } else if (bond.type === 5) {
-            // --- VERBESSERTER KEIL (Wedge) ---
+            // --- KEIL (Wedge) ---
             const startWidth = 1.0; // Startet auf der Breite der normalen Linie (2px)
             const endWidth = 5.0; 
             
