@@ -226,7 +226,7 @@ export function drawScene(
             const ex = a2.x + ux * extension;
             const ey = a2.y + uy * extension;
 
-            ctx.fillStyle = "#000000";
+            ctx.fillStyle = bond.color || options.globalColor;
             ctx.lineJoin = "round"; // Macht die Ecken weicher
             ctx.beginPath();
             // Startseite (kleines Trapez statt spitzer Punkt)
@@ -276,7 +276,7 @@ export function drawScene(
         // 2. Reine Freitext-Elemente zeichnen
         if (atom.element === "TEXT") {
             const txt = parseChemicalRichText(atom.customLabel || "");
-            ctx.fillStyle = "#000000";
+            ctx.fillStyle = atom.color || options.globalColor
             ctx.fillText(txt, atom.x, atom.y);
             continue; 
         }
@@ -330,7 +330,7 @@ export function drawScene(
         if (atom.radical) {
             ctx.beginPath();
             ctx.arc(drawX + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
-            ctx.fillStyle = "#000000";
+            ctx.fillStyle = atom.color || options.globalColor;
             ctx.fill();
         }
 

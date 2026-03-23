@@ -1114,30 +1114,46 @@ document.getElementById('btn-close-style-panel')?.addEventListener('click', () =
     if (stylePanel) stylePanel.style.display = 'none';
 });
 
-// Farbe ändern
+// --- LOKALE SPEICHER-BLOCKER FÜR SLIDER/PICKER ---
+let preStyleStateSaved = false;
+
+// Wenn man die Maus loslässt (change), setzen wir den Blocker zurück
+colorPicker?.addEventListener('change', () => { preStyleStateSaved = false; });
+spacingSlider?.addEventListener('change', () => { preStyleStateSaved = false; });
+
+// Farbe ändern (Live-Vorschau)
 colorPicker?.addEventListener('input', () => {
     const newColor = colorPicker.value;
     const selectedIds = state.getSelectedAtomIds();
     
     if (selectedIds.size > 0) {
-        state.saveState(); // Fürs Undo
+        // NUR 1x Speichern, wenn der Drag beginnt!
+        if (!preStyleStateSaved) { 
+            state.saveState(); 
+            preStyleStateSaved = true; 
+        }
+        
         state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.color = newColor; });
         state.getBonds().forEach(b => { 
             if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.color = newColor; 
         });
     } else {
-        globalColor = newColor; // Globale Variable (siehe Schritt 3 in der vorherigen Nachricht)
+        globalColor = newColor; 
     }
     render();
 });
 
-// Abstand der Doppelbindung ändern
+// Abstand der Doppelbindung ändern (Live-Vorschau)
 spacingSlider?.addEventListener('input', () => {
     const newSpacing = parseFloat(spacingSlider.value);
     if (spacingVal) spacingVal.innerText = newSpacing.toString();
     const selectedIds = state.getSelectedAtomIds();
     
     if (selectedIds.size > 0) {
+        if (!preStyleStateSaved) { 
+            state.saveState(); 
+            preStyleStateSaved = true; 
+        }
         state.getBonds().forEach(b => {
             if (selectedIds.has(b.id1) || selectedIds.has(b.id2)) b.spacing = newSpacing;
         });
@@ -1145,11 +1161,6 @@ spacingSlider?.addEventListener('input', () => {
         globalBondSpacing = newSpacing;
     }
     render();
-});
-
-// Fürs Undo beim Slider-Loslassen (analog zu deinem Bond-Length-Slider)
-spacingSlider?.addEventListener('change', () => {
-    state.saveState();
 });
 
 // Schriftart ändern
