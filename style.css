@@ -1,0 +1,33 @@
+.toolbar {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px); /* Der "Milchglas"-Effekt */
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.toolbar button {
+    background: none;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toolbar button:hover {
+    background: #f0f0f0;
+}
+
+/* Aktives Tool */
+.toolbar button.active {
+    background: #e0e7ff; /* Leichtes Blau */
+    color: #4f46e5;
+}

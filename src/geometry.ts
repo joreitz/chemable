@@ -145,7 +145,6 @@ export function calculateBondOffsetDirection(
     return votes >= 0 ? 1 : -1;
 }
 // Ray-Casting-Algorithmus
-// src/math.ts
 
 export function isPointInPolygon(p: {x: number, y: number}, polygon: {x: number, y: number}[]): boolean {
     let isInside = false;

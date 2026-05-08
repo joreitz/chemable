@@ -5,27 +5,30 @@ import { ChemablePlugin, ChemableContext } from "./plugin-api";
 import { registerPlugin } from "./plugin-manager";
 import { analyzerPlugin } from "./plugins/analyzer";
 import { ehtPlugin } from "./plugins/eht";
+import { ipcRenderer, clipboard, nativeImage } from 'electron';
 registerPlugin(analyzerPlugin);
 
 import { state } from "./state";
 import { Atom, Bond } from "./types";
 import { findAtomNearPosition, getBondAtCoords, isPointInPolygon, rotatePoint, centerOfPoints, angleOfMouseMovement } from "./geometry";
-import { applyAutoLayout, calculateNewAtomPosition } from "./chemistry";
+import { applyAutoLayout, applyForceLayout, calculateNewAtomPosition } from "./chemistry";
 import { drawScene } from "./draw";
 import { periodicTable } from "./pse";
 import { elementLayout } from "./pse_layout";
 import * as fs from 'fs';
-import { generateSVG } from "./export";
 import { jsPDF } from 'jspdf';
 import 'svg2pdf.js';
 import { generateSmiles, parseSmiles } from './smiles';
+import { init3DViewer } from "./viewer3d";
+import { generateSVG, generateXYZ, convertSdfToXyz } from "./export";
+import { MOLECULE_TEMPLATES } from "./templates";
 
-// Lokale UI-Variablen (Dinge, die NICHT im History-Undo gespeichert werden müssen)
+// Lokale UI-Variablen 
 let editMode: "draw" | "move" | "erase" | "select" | "text" | "arrow" = "draw";
 let currentFontSize = 16;
 let showValenceWarnings = true;
 let showGrid = false;
-let currentBondLength = 60; // (Standard: 60)
+let currentBondLength = 60; 
 let currentBondType = 1; // 1 = Normal, 5 = Keil (Wedge), 6 = Gestrichelt (Dash)
 
 // Für das Auswahl-Tool
@@ -55,6 +58,61 @@ let lastPanMouseY = 0;
 let globalBondSpacing = 5;
 let globalFontFamily = "Arial";
 let globalColor = "#000000";
+
+function initTemplates() {
+    const container = document.getElementById('template-dropdown');
+    if (!container) return;
+
+    Object.keys(MOLECULE_TEMPLATES).forEach(name => {
+        const btn = document.createElement('button');
+        btn.innerText = name;
+        btn.onclick = () => insertTemplate(MOLECULE_TEMPLATES[name]);
+        container.appendChild(btn);
+    });
+}
+
+function insertTemplate(smiles: string) {
+    state.saveState();
+    
+    const rect = canvas.getBoundingClientRect();
+    const { atoms, bonds } = parseSmiles(smiles, rect.width / 2, rect.height / 2);
+    
+    const newIds: number[] = [];
+    const idMap = new Map<number, number>();
+
+    atoms.forEach(a => {
+        const newId = state.getNextId();
+        idMap.set(a.id, newId);
+        state.addAtom({ ...a, id: newId });
+        newIds.push(newId);
+    });
+
+    bonds.forEach(b => {
+        state.addBond({ ...b, id1: idMap.get(b.id1)!, id2: idMap.get(b.id2)! });
+    });
+
+    state.clearSelection();
+    state.selectAtoms(newIds);
+
+    
+    setMode("select");
+    render();
+}
+
+function copyToOffice() {
+    const atoms = state.getAtoms();
+    const bonds = state.getBonds();
+    const selectedIds = state.getSelectedAtomIds();
+    
+    const svgString = generateSVG(atoms, bonds, selectedIds, currentFontSize);
+    if (!svgString) return;
+
+    clipboard.write({
+        html: svgString,
+        text: svgString 
+    });
+    console.log("Copied to clipboard!");
+}
 
 function openTextEditor(atom: Atom) {
     atomToEdit = atom;
@@ -199,7 +257,7 @@ canvas.addEventListener('mousedown', (e) => {
     render();
 });
 
-// --- 2. MOUSEMOVE ---
+// --- MOUSEMOVE ---
 canvas.addEventListener('mousemove', (e) => {
     // A) PANNING (Muss zuerst kommen!)
     if (isPanning) {
@@ -497,9 +555,8 @@ canvas.addEventListener('mouseup', (e) => {
     }
     render();
 });
-// --- UI BUTTONS ---
 
-// Hier wird ein state gesetzt, also speichern wir den alten Zustand
+// --- UI BUTTONS ---
 
 document.getElementById('btn-clear')?.addEventListener('click', () => { 
     state.clear(); 
@@ -518,16 +575,67 @@ document.getElementById('btn-grid')?.addEventListener('click', () => {
 
 document.getElementById('btn-undo')?.addEventListener('click', performUndo);
 
+
+document.getElementById('btn-export-xyz')?.addEventListener('click', async () => {
+    const atoms = state.getAtoms();
+    const bonds = state.getBonds();
+    
+    const smiles = generateSmiles(atoms, bonds);
+    if (!smiles) {
+        alert("Nothing to export!");
+        return;
+    }
+
+    try {
+        document.body.style.cursor = "wait";
+
+        const response = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smiles)}/sdf?get3d=true`);
+
+        if (!response.ok) {
+            throw new Error("Error with 3D calculation. Is the molecular connectivity valid?");
+        }
+
+        const sdfString = await response.text();
+        
+
+        const xyzString = convertSdfToXyz(sdfString);
+
+        const blob = new Blob([xyzString], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "molecule_3d.xyz";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (err) {
+        console.error(err);
+        alert("3D-Export failed: " + (err as Error).message + "\n\nFalling back to 2D export.");
+        
+        const fallbackXyz = generateXYZ(atoms);
+        const blob = new Blob([fallbackXyz], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "molekuel_2d_planar.xyz";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
+        document.body.style.cursor = "default";
+    }
+});
+
 const textEditorDiv = document.getElementById('custom-text-editor')!;
 const textEditorInput = document.getElementById('custom-text-input') as HTMLInputElement;
 const textEditorFlip = document.getElementById('custom-text-flip') as HTMLInputElement;
 const textEditorAlign = document.getElementById('custom-text-align') as HTMLInputElement;
 let atomToEdit: Atom | null = null;
 
-// Tastaturkürzel Undo
-let clipboardData: { atoms: Atom[], bonds: Bond[] } | null = null;
 
-// Hotkeys aus dem LocalStorage laden (inklusive Werkzeuge!)
+let clipboardData: { atoms: Atom[], bonds: Bond[] } | null = null;
 let hotkeys = JSON.parse(localStorage.getItem('chemable-hotkeys') || '{"copy":"c","paste":"v","cut":"x","undo":"z","text":"t","draw":"d","move":"m","erase":"e","select":"l","arrow":"a"}');
 
 function copySelection() {
@@ -538,6 +646,116 @@ function copySelection() {
     const bonds = state.getBonds().filter(b => selectedIds.has(b.id1) && selectedIds.has(b.id2));
     
     clipboardData = JSON.parse(JSON.stringify({ atoms, bonds }));
+
+    const svgString = generateSVG(state.getAtoms(), state.getBonds(), selectedIds, currentFontSize);
+    
+    if (svgString) {
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = () => {
+            const tempCanvas = document.createElement('canvas');
+            const scale = 4; 
+            tempCanvas.width = img.width * scale;
+            tempCanvas.height = img.height * scale;
+            const tCtx = tempCanvas.getContext('2d');
+            
+            if (tCtx) {
+                tCtx.fillStyle = '#ffffff';
+                tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                tCtx.scale(scale, scale); 
+                tCtx.drawImage(img, 0, 0);
+                
+                const pngDataUrl = tempCanvas.toDataURL('image/png');
+                const jsonData = JSON.stringify({ atoms, bonds });
+                
+                // Wir verstecken die Daten in einem HTML-Kommentar - Word zeigt diesen nicht an!
+                const htmlString = `
+                    <html>
+                    <body>
+                        <img src="${pngDataUrl}" width="${img.width}" height="${img.height}" />
+                    </body>
+                    </html>
+                `;
+                
+                clipboard.write({
+                    html: htmlString,
+                    image: nativeImage.createFromDataURL(pngDataUrl)
+                    // KEIN 'text' Feld mehr, damit Word nicht den rohen String einfügt!
+                });
+                console.log("Kopiert (Daten im HTML-Kommentar versteckt)");
+            }
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    }
+}
+
+function pasteSelection() {
+    state.saveState();
+    
+    let pastedAtoms: Atom[] | null = null;
+    let pastedBonds: Bond[] | null = null;
+    const sysHtml = clipboard.readHTML() || "";
+
+    // Daten aus dem HTML-Kommentar extrahieren
+    const match = sysHtml.match(/CHEMABLE_JSON_START (.*?) CHEMABLE_JSON_END/);
+    if (match && match[1]) {
+        try {
+            const parsed = JSON.parse(match[1]);
+            pastedAtoms = parsed.atoms;
+            pastedBonds = parsed.bonds;
+        } catch(e) {}
+    }
+
+    // Fallback auf internen Speicher
+    if (!pastedAtoms && clipboardData) {
+        pastedAtoms = JSON.parse(JSON.stringify(clipboardData.atoms));
+        pastedBonds = JSON.parse(JSON.stringify(clipboardData.bonds));
+    }
+
+    if (!pastedAtoms || pastedAtoms.length === 0) return;
+
+    const idMap = new Map<number, number>();
+    const pastedAtomIds: number[] = [];
+
+    // Zentrum der neuen Atome finden
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pastedAtoms.forEach(a => {
+        minX = Math.min(minX, a.x); minY = Math.min(minY, a.y);
+        maxX = Math.max(maxX, a.x); maxY = Math.max(maxY, a.y);
+    });
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Offset berechnen: Klebt jetzt direkt an der Maus
+    const dx = currentMouseX - centerX;
+    const dy = currentMouseY - centerY;
+
+    pastedAtoms.forEach(a => {
+        const newId = state.getNextId();
+        idMap.set(a.id, newId);
+        state.addAtom({ ...a, id: newId, x: a.x + dx, y: a.y + dy });
+        pastedAtomIds.push(newId);
+    });
+
+    if (pastedBonds) {
+        pastedBonds.forEach(b => {
+            state.addBond({ ...b, id1: idMap.get(b.id1)!, id2: idMap.get(b.id2)! });
+        });
+    }
+
+    state.clearSelection();
+    state.selectAtoms(pastedAtomIds);
+    if (typeof setMode === "function") setMode("select"); 
+    
+    // Drag-Status aktivieren, damit es an der Maus "hängt"
+    isDraggingSelection = true;
+    dragStartX = currentMouseX;
+    dragStartY = currentMouseY;
+    
+    render();
 }
 
 function cutSelection() {
@@ -552,44 +770,9 @@ function cutSelection() {
     render();
 }
 
-function pasteSelection() {
-    if (!clipboardData || clipboardData.atoms.length === 0) return;
-    state.saveState();
-    
-    const idMap = new Map<number, number>();
-    const pastedAtomIds: number[] = [];
-
-    let cx = 0, cy = 0;
-    clipboardData.atoms.forEach(a => { cx += a.x; cy += a.y; });
-    cx /= clipboardData.atoms.length;
-
-    const dx = currentMouseX - cx;
-    const dy = currentMouseY - cy;
-
-    clipboardData.atoms.forEach(a => {
-        const newId = state.getNextId();
-        idMap.set(a.id, newId);
-        const newAtom: Atom = { ...a, id: newId, x: a.x + dx, y: a.y + dy };
-        state.addAtom(newAtom);
-        pastedAtomIds.push(newId);
-    });
-
-    clipboardData.bonds.forEach(b => {
-        state.addBond({ ...b, id1: idMap.get(b.id1)!, id2: idMap.get(b.id2)!, type: currentBondType });
-    });
-
-    state.clearSelection();
-    state.selectAtoms(pastedAtomIds);
-    setMode("select");
-    isDraggingSelection = true; 
-    dragStartX = currentMouseX;
-    dragStartY = currentMouseY;
-    
-    render();
-}
 
 // ==========================================
-// --- DER NEUE KEYDOWN LISTENER ---
+// --- KEYDOWN LISTENER ---
 // ==========================================
 
 document.addEventListener('keydown', (event) => {
@@ -669,49 +852,40 @@ textEditorInput.addEventListener('keydown', (e) => {
     }
 });
 
-// Modus umschalten
-function setMode(mode: "draw" | "move" | "erase" | "select" | "text" | "arrow") {
+
+function setMode(mode: "draw" | "move" | "erase" | "select" | "text" | "arrow", activeBtnId?: string) {
     editMode = mode;
     
-    // 1. Alle Buttons resetten (Farbe entfernen)
-    // Wir packen die IDs in ein Array, damit wir nichts vergessen
-    const btnIds = ['btn-draw', 'btn-move', 'btn-erase', 'btn-select'];
+    // 1. Alle Buttons resetten (Klasse "active" entfernen)
+    const tools = document.querySelectorAll('.tool-btn');
+    tools.forEach(el => el.classList.remove('active'));
     
-    btnIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.backgroundColor = "";
-    });
-    
-    // 2. Den aktiven Button färben
-    // Da wir die IDs schlau benannt haben (btn-draw, btn-select...), geht das dynamisch:
-    const activeBtn = document.getElementById(`btn-${mode}`);
-    if (activeBtn) activeBtn.style.backgroundColor = "#ddd"; // Aktiv-Farbe
+    // 2. Den aktiven Button markieren
+    // Entweder die übergebene ID (z.B. "btn-wedge") oder Standard ("btn-draw")
+    const btnIdToActivate = activeBtnId || `btn-${mode}`;
+    const activeBtn = document.getElementById(btnIdToActivate);
+    if (activeBtn) activeBtn.classList.add('active');
     
     // 3. Cursor anpassen
-    if (mode === "erase") {
-        canvas.style.cursor = "not-allowed"; 
-    } else if (mode === "move") {
-        canvas.style.cursor = "move";
-    } else if (mode === "select") {
-        canvas.style.cursor = "default"; // Normaler Pfeil für Auswahl
-    } else {
-        canvas.style.cursor = "crosshair"; // Fadenkreuz fürs Zeichnen
-    }
+    if (mode === "erase") canvas.style.cursor = "not-allowed";
+    else if (mode === "move") canvas.style.cursor = "move";
+    else if (mode === "select") canvas.style.cursor = "default";
+    else canvas.style.cursor = "crosshair";
 }
-// Das ersetzt die Logik aus meiner letzten Nachricht!
+
 document.getElementById('btn-draw')?.addEventListener('click', () => {
-    setMode("draw");
-    currentBondType = 1; // Normaler Stift
+    setMode("draw", "btn-draw");
+    currentBondType = 1;
 });
 
 document.getElementById('btn-wedge')?.addEventListener('click', () => {
-    setMode("draw");
-    currentBondType = 5; // Keil-Stift
+    setMode("draw", "btn-wedge"); 
+    currentBondType = 5;
 });
 
 document.getElementById('btn-dash')?.addEventListener('click', () => {
-    setMode("draw");
-    currentBondType = 6; // Dash-Stift
+    setMode("draw", "btn-dash"); 
+    currentBondType = 6;
 });
 
 document.getElementById('btn-move')?.addEventListener('click', () => setMode("move"));
@@ -802,8 +976,6 @@ document.getElementById('hk-btn-save')?.addEventListener('click', () => {
     if (hotkeyDialog) hotkeyDialog.style.display = 'none';
 });
 
-
-// Funktion: PSE-Grid einmalig aufbauen
 function initPSE() {
     if (!pseGrid) return;
     pseGrid.innerHTML = ""; // Leer machen
@@ -844,7 +1016,7 @@ function initPSE() {
 document.getElementById('btn-arrow')?.addEventListener('click', () => setMode("arrow"));
 document.getElementById('btn-text')?.addEventListener('click', () => setMode("text"));
 
-//
+
 const fontSlider = document.getElementById('font-size-slider') as HTMLInputElement;
 const fontVal = document.getElementById('font-size-val');
 fontSlider?.addEventListener('input', () => {
@@ -852,8 +1024,8 @@ fontSlider?.addEventListener('input', () => {
     if (fontVal) fontVal.innerText = currentFontSize.toString();
     render();
 });
-//
 
+init3DViewer();
 // Initialisierung aufrufen
 initPSE();
 
@@ -909,7 +1081,6 @@ bondLengthSlider?.addEventListener('input', (e) => {
     render();
 });
 
-// Wenn man die Maus am Slider loslässt, setzen wir den Speicher-Blocker zurück
 bondLengthSlider?.addEventListener('change', () => {
     preSlideStateSaved = false;
 });
@@ -1076,21 +1247,15 @@ document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
     const inputStr = smilesInput.value.trim();
     if (inputStr) {
         state.saveState();
-        
-        // Wir platzieren es in der Mitte des Bildschirms (inkl. Panning)
         const rect = canvas.getBoundingClientRect();
         const startX = (rect.width / 2) - panX;
         const startY = (rect.height / 2) - panY;
         
-        // Atome und Bindungen generieren
         const { atoms, bonds } = parseSmiles(inputStr, startX, startY);
         
-        // Zum aktuellen State hinzufügen
         atoms.forEach(a => state.addAtom(a));
-        bonds.forEach(b => state.addBond({ ...b, type: currentBondType }));
-        
-        // DER MAGISCHE TRICK: Wir jagen die NEUEN Atome direkt durch das Auto-Layout!
-        applyAutoLayout(atoms, state.getBonds());
+        bonds.forEach(b => state.addBond({ ...b, type: 1 }));
+        applyForceLayout(atoms, state.getBonds(), 200);
         
         render();
     }
@@ -1174,12 +1339,55 @@ fontSelect?.addEventListener('change', () => {
 });
 
 initPSE();
+initTemplates();
 
 function resizeCanvas() {
-    canvas.width = window.innerWidth - 20;
-    canvas.height = window.innerHeight - 80; // Platz für die Toolbar abziehen
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     render();
 }
+
+function makeDraggable(elementId: string) {
+    const elmnt = document.getElementById(elementId);
+    if (!elmnt) return;
+    
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    elmnt.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e: MouseEvent) {
+        // Nicht ziehen, wenn man auf einen Button, Input oder Select klickt!
+        const targetTag = (e.target as HTMLElement).tagName;
+        if (targetTag === 'BUTTON' || targetTag === 'INPUT' || targetTag === 'SELECT') return;
+        
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e: MouseEvent) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // Neue Position setzen
+        elmnt!.style.top = (elmnt!.offsetTop - pos2) + "px";
+        elmnt!.style.left = (elmnt!.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}
+
+makeDraggable("menubar");
+makeDraggable("toolbar");
+makeDraggable("pse-menu");
+makeDraggable("style-panel");
+
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas(); 
 render();

@@ -2,7 +2,6 @@ import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 
 function createWindow() {
-  // Erstelle das Browser-Fenster
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -12,11 +11,9 @@ function createWindow() {
     }
   });
 
-  // Lade die index.html Datei
   mainWindow.loadFile(path.join(__dirname, '../index.html'));
 }
 
-// Wenn Electron bereit ist, Fenster öffnen
 app.whenReady().then(() => {
   createWindow();
 
@@ -25,7 +22,6 @@ app.whenReady().then(() => {
   });
 });
 
-// Beenden, wenn alle Fenster geschlossen sind (außer auf Mac!?)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

@@ -221,9 +221,67 @@ function recursiveLayout(
     }
 }
 
-export function applyAutoLayout(atoms: Atom[], bonds: Bond[]) {
+export function applyForceLayout(atoms: Atom[], bonds: Bond[], iterations: number = 150) {
     if (atoms.length === 0) return;
-    const visited = new Set<number>();
-    // Start beim ersten Atom der übergebenen Liste
-    recursiveLayout(atoms[0].id, atoms, bonds, visited, null, 1);
+
+    const idealDist = 60;   
+    const kRepulsion = 2500; 
+    const kAttraction = 0.08; 
+
+    for (let i = 0; i < iterations; i++) {
+        const forces = new Map<number, { fx: number, fy: number }>();
+        atoms.forEach(a => forces.set(a.id, { fx: 0, fy: 0 }));
+
+        for (let j = 0; j < atoms.length; j++) {
+            for (let l = j + 1; l < atoms.length; l++) {
+                const a = atoms[j];
+                const b = atoms[l];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                const distSq = dx * dx + dy * dy || 1;
+                const dist = Math.sqrt(distSq);
+
+                const force = kRepulsion / distSq;
+                const fx = (dx / dist) * force;
+                const fy = (dy / dist) * force;
+
+                forces.get(a.id)!.fx += fx;
+                forces.get(a.id)!.fy += fy;
+                forces.get(b.id)!.fx -= fx;
+                forces.get(b.id)!.fy -= fy;
+            }
+        }
+
+        bonds.forEach(bond => {
+            const a = atoms.find(at => at.id === bond.id1);
+            const b = atoms.find(at => at.id === bond.id2);
+            if (!a || !b) return;
+
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            // Federkraft (Hookesches Gesetz)
+            const targetDist = getIdealBondLength(bond, atoms) || idealDist;
+            const force = (dist - targetDist) * kAttraction;
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+
+            forces.get(a.id)!.fx -= fx;
+            forces.get(a.id)!.fy -= fy;
+            forces.get(b.id)!.fx += fx;
+            forces.get(b.id)!.fy += fy;
+        });
+
+        atoms.forEach(a => {
+            const f = forces.get(a.id)!;
+            a.x += Math.max(-15, Math.min(15, f.fx));
+            a.y += Math.max(-15, Math.min(15, f.fy));
+        });
+    }
+}
+
+// Wir behalten die alte Funktion als Alias bei, damit wir nicht alles umbauen müssen
+export function applyAutoLayout(atoms: Atom[], bonds: Bond[]) {
+    applyForceLayout(atoms, bonds);
 }

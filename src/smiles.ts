@@ -1,11 +1,9 @@
 // src/smiles.ts
 import { Atom, Bond } from "./types";
 
-// --- 1. SMILES EXPORT (Generator) ---
 export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
     if (atoms.length === 0) return "";
     
-    // Adjazenzliste bauen (Wer ist mit wem verbunden?)
     const adj: Record<number, {to: Atom, bond: Bond}[]> = {};
     atoms.forEach(a => adj[a.id] = []);
     bonds.forEach(b => {
@@ -17,55 +15,98 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
         }
     });
 
-    const visited = new Set<number>();
     let smiles = "";
     let ringCounter = 1;
-    const ringMap = new Map<string, number>();
+    
+    // Speichert die Ring-Zahlen für jedes Atom (z.B. Atom bekommt Ring "1" und "2")
+    const atomRingClosures: Record<number, string[]> = {};
+    atoms.forEach(a => atomRingClosures[a.id] = []);
 
-    function dfs(curr: Atom, prev: Atom | null) {
-        visited.add(curr.id);
+    const treeEdges = new Set<Bond>();
+    const ringEdges = new Set<Bond>();
+    const globalVisited = new Set<number>();
+
+    // SCHRITT 1: Spanning Tree (Hauptbaum) & Ringschlüsse finden
+    for (const a of atoms) {
+        if (globalVisited.has(a.id) || a.element === "DUMMY" || a.element === "TEXT") continue;
         
-        // Element + Ladung formatieren (z.B. [O-])
+        const dfsBuildTree = (currId: number, prevId: number | null) => {
+            globalVisited.add(currId);
+            for (const n of adj[currId]) {
+                if (n.to.id === prevId) continue;
+                
+                if (globalVisited.has(n.to.id)) {
+                    // Ring gefunden! 
+                    if (!ringEdges.has(n.bond)) {
+                        ringEdges.add(n.bond);
+                        const rNum = ringCounter++;
+                        let rStr = rNum.toString();
+                        
+                        // SMILES Syntax: Ringe über 9 werden mit % markiert (wichtig für Fullerene!)
+                        if (rNum > 9) rStr = "%" + rStr; 
+                        
+                        let prefix = "";
+                        if (n.bond.type === 2) prefix = "=";
+                        if (n.bond.type === 3) prefix = "#";
+                        
+                        atomRingClosures[currId].push(prefix + rStr);
+                        atomRingClosures[n.to.id].push(rStr); // Das Zielatom bekommt nur die Nummer
+                    }
+                } else {
+                    treeEdges.add(n.bond);
+                    dfsBuildTree(n.to.id, currId);
+                }
+            }
+        };
+        dfsBuildTree(a.id, null);
+    }
+
+    // SMILES String aufbauen
+    const printed = new Set<number>();
+    
+    function dfsPrint(curr: Atom, prev: Atom | null) {
+        printed.add(curr.id);
+        
+        const organicSubset = new Set(["B", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"]);
         let elStr = curr.element;
-        if (curr.charge || curr.radical) {
+        
+        const needsBrackets = !organicSubset.has(curr.element) || curr.charge || curr.radical;
+        
+        if (needsBrackets) {
             let chargeStr = "";
-            if (curr.charge) chargeStr = curr.charge > 0 ? `+${curr.charge === 1 ? '' : curr.charge}` : `-${curr.charge === -1 ? '' : Math.abs(curr.charge)}`;
+            if (curr.charge) {
+                chargeStr = curr.charge > 0 ? `+${curr.charge === 1 ? '' : curr.charge}` : `-${curr.charge === -1 ? '' : Math.abs(curr.charge)}`;
+            }
             elStr = `[${curr.element}${chargeStr}]`;
         }
         smiles += elStr;
 
-        const neighbors = adj[curr.id].filter(n => n.to.id !== prev?.id);
-        const unvisited = neighbors.filter(n => !visited.has(n.to.id));
-        const ringClosures = neighbors.filter(n => visited.has(n.to.id));
-
-        // Ringschlüsse verarbeiten (Zahlen 1-9)
-        for (const r of ringClosures) {
-            const bondId = [curr.id, r.to.id].sort().join('-');
-            if (!ringMap.has(bondId)) {
-                ringMap.set(bondId, ringCounter++);
-            }
-            const rNum = ringMap.get(bondId)!;
-            if (r.bond.type === 2) smiles += '=';
-            if (r.bond.type === 3) smiles += '#';
-            smiles += rNum.toString();
+        // Ringschlüsse direkt nach dem Atom anhängen 
+        if (atomRingClosures[curr.id].length > 0) {
+            smiles += atomRingClosures[curr.id].join('');
         }
 
-        // Verzweigungen verarbeiten
-        for (let i = 0; i < unvisited.length; i++) {
-            const isLast = i === unvisited.length - 1;
+        const children = adj[curr.id].filter(n => n.to.id !== prev?.id && treeEdges.has(n.bond) && !printed.has(n.to.id));
+        
+        // Verzweigungen zeichnen
+        for (let i = 0; i < children.length; i++) {
+            const isLast = i === children.length - 1;
             if (!isLast) smiles += '(';
-            if (unvisited[i].bond.type === 2) smiles += '=';
-            if (unvisited[i].bond.type === 3) smiles += '#';
-            dfs(unvisited[i].to, curr);
+            
+            if (children[i].bond.type === 2) smiles += '=';
+            if (children[i].bond.type === 3) smiles += '#';
+            
+            dfsPrint(children[i].to, curr);
+            
             if (!isLast) smiles += ')';
         }
     }
 
-    // Für unverbundene Moleküle (z.B. Ionen oder Reaktionsgleichungen)
+    // Generierung für alle (auch unverbundene) Moleküle starten
     for (const a of atoms) {
-        if (!visited.has(a.id) && a.element !== "DUMMY" && a.element !== "TEXT") {
+        if (!printed.has(a.id) && a.element !== "DUMMY" && a.element !== "TEXT") {
             if (smiles !== "") smiles += ".";
-            dfs(a, null);
+            dfsPrint(a, null);
         }
     }
 

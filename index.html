@@ -1,160 +1,307 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+    <script src="https://3Dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chemable Editor</title>
     <style>
-        /* Grundlegendes Layout */
-        body { margin: 0; padding: 0; overflow: hidden; background-color: #f4f4f4; }
+        /* --- GLOBALE STYLES --- */
+        :root {
+            --primary: #4f46e5;       /* Modernes Indigoblau für aktive Elemente */
+            --primary-bg: #e0e7ff;    /* Heller Hintergrund für aktive Buttons */
+            --text-main: #374151;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        body { 
+            margin: 0; padding: 0; overflow: hidden; 
+            background-color: #f3f4f6; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+        }
+
+        /* --- CANVAS --- */
+        #chemBoard {
+            position: absolute;
+            top: 0; left: 0;
+            background-color: #ffffff;
+            z-index: 1;
+        }
+
+        /* --- GLASSMORPHISM PANELS --- */
+        .glass-panel {
+            position: absolute;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+            border-radius: 12px;
+            display: flex;
+        }
+
+        /* Top Bar (Datei, Bearbeiten, etc.) */
+        #menubar {
+            top: 20px;
+            left: 20px;
+            padding: 5px 15px;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Side Bar (Werkzeuge zum Zeichnen) */
+        #toolbar {
+            top: 90px;
+            left: 20px;
+            padding: 10px;
+            flex-direction: column;
+            gap: 8px;
+            width: 160px;
+        }
+
+        /* --- BUTTONS --- */
+        button {
+            background: none;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-main);
+            transition: all 0.2s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        /* Spezielles Styling für die aktiven Werkzeuge */
+        .tool-btn { font-weight: 500; width: 100%; }
         
-        /* Dropdown CSS für die Menüleiste */
+        /* Diese Klasse wird per JS gesetzt, wenn ein Tool aktiv ist */
+        .tool-btn.active {
+            background-color: var(--primary-bg) !important;
+            color: var(--primary) !important;
+            font-weight: 600;
+        }
+
+        /* --- DROPDOWNS --- */
         .dropdown { position: relative; display: inline-block; }
-        .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 2000; border-radius: 4px; border: 1px solid #ccc; }
+        .dropdown-content { 
+            display: none; position: absolute; 
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0,0,0,0.1);
+            min-width: 200px; 
+            box-shadow: var(--shadow); 
+            z-index: 2000; 
+            border-radius: 8px;
+            top: 100%; 
+            margin-top: 0px; 
+            padding: 5px 0;
+            overflow: hidden;
+        }
         .dropdown:hover .dropdown-content { display: block; }
-        .dropdown-content button { width: 100%; text-align: left; padding: 10px 16px; border: none; background: none; cursor: pointer; font-size: 14px; }
-        .dropdown-content button:hover { background-color: #e2e3e5; }
-        .menu-btn { border: none; background: none; font-weight: bold; padding: 8px 12px; cursor: pointer; font-size: 14px; }
-        .menu-btn:hover { background-color: #e2e3e5; border-radius: 4px; }
+        .dropdown-content button { width: 100%; border-radius: 0; padding: 10px 16px; }
+        .menu-btn { font-weight: 600; }
+
+        hr.divider { margin: 4px 0; border: 0; border-top: 1px solid rgba(0,0,0,0.1); }
+
+        /* --- SLIDER BEREICH --- */
+        .slider-group {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; margin-left: 15px;
+            padding-left: 15px; border-left: 1px solid rgba(0,0,0,0.1);
+        }
+        .slider-group input { width: 80px; cursor: pointer; }
+        .slider-group span { font-weight: bold; min-width: 20px; display: inline-block; text-align: right;}
+
+        /* --- MODALS (Dialogfenster) --- */
+        .modal {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            font-family: sans-serif;
+            color: var(--text-main);
+        }
+        
+        .modal h3 { margin-top: 0; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px; }
+        .modal input[type="text"] { border: 1px solid #ccc; border-radius: 6px; padding: 8px; width: calc(100% - 18px); outline: none; transition: border 0.2s;}
+        .modal input[type="text"]:focus { border-color: var(--primary); }
+        .btn-primary { background: var(--primary); color: white; font-weight: bold; justify-content: center; width: 100%; padding: 10px;}
+        .btn-primary:hover { background: #4338ca; }
+        .btn-secondary { background: #e5e7eb; font-weight: bold; justify-content: center; width: 100%; padding: 10px; margin-top: 8px;}
+
     </style>
 </head>
 <body>
 
-    <div id="menubar" style="background: #f0f0f0; padding: 5px 10px; border-bottom: 1px solid #ccc; font-family: sans-serif; display: flex; align-items: center;">
-        
+    <div id="menubar" class="glass-panel">
         <div class="dropdown">
-            <button class="menu-btn">📂 Datei</button>
+            <button class="menu-btn">File</button>
             <div class="dropdown-content">
-                <button id="btn-save">💾 Speichern (.chem)</button>
-                <button id="btn-load">📂 Öffnen</button>
-                <hr style="margin: 0; border: 0; border-top: 1px solid #ccc;">
-                <button id="btn-export-svg">🖼️ Export als SVG</button>
-                <button id="btn-export-pdf">📄 Export als PDF</button>
-                <button id="btn-smiles">🧬 SMILES Im-/Export</button>
+                <button id="btn-save"> Save (.chem)</button>
+                <button id="btn-load"> Open...</button>
+                <hr class="divider">
+                <button id="btn-export-svg"> Export as SVG</button>
+                <button id="btn-export-pdf"> Export as PDF</button>
+                <button id="btn-export-xyz"> Export as .xyz</button>
+                <button id="btn-smiles"> SMILES in-/export</button>
             </div>
         </div>
 
         <div class="dropdown">
-            <button class="menu-btn">✏️ Bearbeiten</button>
+            <button class="menu-btn">Templates</button>
+            <div class="dropdown-content" id="template-dropdown">
+                </div>
+        </div>
+
+        <div class="dropdown">
+            <button class="menu-btn"> Edit</button>
             <div class="dropdown-content">
-                <button id="btn-undo">↩️ Rückgängig (Strg+Z)</button>
-                <button id="btn-clean">✨ Auto-Layout (Clean)</button>
-                <button id="btn-clear">🗑️ Alles löschen</button>
-                <hr style="margin: 0; border: 0; border-top: 1px solid #ccc;">
-                <button id="btn-hotkeys">⌨️ Hotkeys anpassen</button>
+                <button id="btn-undo">↩ Undo (Ctrl+Z)</button>
+                <button id="btn-clean"> Auto-Layout (Clean)</button>
+                <button id="btn-clear"> Clear All</button>
+                <hr class="divider">
+                <button id="btn-hotkeys">⌨ Hotkeys anpassen</button>
             </div>
         </div>
 
         <div class="dropdown">
-            <button class="menu-btn">👁️ Ansicht</button>
+            <button class="menu-btn"> View </button>
             <div class="dropdown-content">
-                <button id="btn-warnings" style="background-color: #ffcccc;"> Warnungen: An</button>
-                <button id="btn-grid">🔲 Raster: Aus</button>
+                <button id="btn-warnings"> Warning: On</button>
+                <button id="btn-grid"> Grid: Off</button>
             </div>
         </div>
+
         <div class="dropdown">
-            <button class="menu-btn">🧩 Plugins</button>
+            <button class="menu-btn"> Plugins</button>
             <div class="dropdown-content" id="plugin-dropdown-content">
                 </div>
         </div>
-        <div style="margin-left: auto; display: flex; align-items: center; font-size: 13px;">
-            <label for="bond-length-slider">Länge: <span id="bond-length-val">60</span></label>
-            <input type="range" id="bond-length-slider" min="20" max="150" value="60" style="width: 70px; margin: 0 10px 0 5px;">
-            <label for="font-size-slider">Schrift: <span id="font-size-val">16</span></label>
-            <input type="range" id="font-size-slider" min="10" max="36" value="16" style="width: 70px; margin-left: 5px;">
+
+        <div class="slider-group">
+            <label for="bond-length-slider">Length:</label>
+            <input type="range" id="bond-length-slider" min="20" max="150" value="60">
+            <span id="bond-length-val">60</span>
+        </div>
+        
+        <div class="slider-group" style="border-left:none; margin-left:0; padding-left:0;">
+            <label for="font-size-slider">Font:</label>
+            <input type="range" id="font-size-slider" min="10" max="36" value="16">
+            <span id="font-size-val">16</span>
         </div>
     </div>
 
-    <div id="toolbar" style="background: #ffffff; padding: 8px 10px; border-bottom: 1px solid #ccc; font-family: sans-serif; display: flex; gap: 5px;">
-        <button id="btn-draw" style="font-weight:bold; background-color:#ddd;" title="Zeichnen (D)">✏️ Zeichnen</button>
-        <button id="btn-wedge" title="Keil (W)"> Keil</button>
-        <button id="btn-dash" title="Gestrichelt (S)"> Dash</button>
-        <button id="btn-move" title="Verschieben (M)"> Move</button>
-        <button id="btn-erase" title="Radierer (E)"> Erase</button>
-        <button id="btn-select" title="Lasso Auswahl (L)"> Lasso</button>
-        <button id="btn-text" title="Freitext (T)">Abc Text</button>
-        <button id="btn-arrow" title="Reaktionspfeil (A)">➔ Pfeil</button>
-        <button id="btn-style-menu" title="Dokument- & Auswahl-Styles"> Styles</button>
+    <div id="toolbar" class="glass-panel">
+        <div style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #9ca3af; padding: 0 8px 4px 8px; letter-spacing: 0.5px;">Werkzeuge</div>
         
-        <span style="border-left: 1px solid #ccc; height: 24px; margin: 0 5px;"></span>
+        <button id="btn-draw" class="tool-btn active" title="Zeichnen (D)"> Draw</button>
+        <button id="btn-wedge" class="tool-btn" title="Keil (W)"> Wedge </button>
+        <button id="btn-dash" class="tool-btn" title="Gestrichelt (S)"> Dash</button>
+        <button id="btn-move" class="tool-btn" title="Verschieben (M)"> Move </button>
+        <button id="btn-erase" class="tool-btn" title="Radierer (E)"> Eraser </button>
+        <button id="btn-select" class="tool-btn" title="Lasso Auswahl (L)"> Lasso</button>
+        <button id="btn-text" class="tool-btn" title="Freitext (T)"> Text</button>
+        <button id="btn-arrow" class="tool-btn" title="Reaktionspfeil (A)"> Arrow</button>
+        <button id="btn-3d" class="tool-btn" title="3D Ansicht (Kraftfeld)"> 3D Viewer</button>
+        <hr class="divider" style="margin: 8px 0; width: 100%;">
         
-        <button id="btn-pse">Atom wählen...</button>
-        <span id="current-element-display" style="font-weight: bold; margin-left: 5px; align-self: center;">[ C ]</span>
-    </div>
-
-    <canvas id="chemBoard" width="800" height="600" style="background-color: white; cursor: crosshair; display: block;"></canvas>
-
-    <div id="custom-text-editor" style="display:none; position:absolute; z-index:1000; background:white; border:2px solid #0088ff; border-radius:4px; padding:8px; box-shadow:0 4px 10px rgba(0,0,0,0.2); font-family: sans-serif;">
-        <input type="text" id="custom-text-input" placeholder="z.B. OPO_3^(2-)" style="width:150px; outline:none; border:1px solid #ccc; padding:4px; margin-bottom: 5px;">
-        <br>
-        <label style="font-size: 12px; cursor: pointer;">
-            <input type="checkbox" id="custom-text-flip"> Zur Bindung ausrichten
-        </label>
-        <br>
-        <label style="font-size: 12px; cursor: pointer;">
-            <input type="checkbox" id="custom-text-align"> Am 1. Buchstaben zentrieren
-        </label>
-        <br>
-        <button id="custom-text-save" style="cursor:pointer; margin-top: 5px; width: 100%; background: #0088ff; color: white; border: none; padding: 4px;">OK</button>
-    </div>
-
-    <div id="smiles-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border:2px solid #333; border-radius:8px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; text-align: center; font-family: sans-serif;">
-        <h3 style="margin-top:0;">SMILES Code</h3>
-        <input type="text" id="smiles-input" style="width: 350px; padding: 8px; font-family: monospace; font-size: 14px; margin-bottom: 15px;" />
-        <br>
-        <button id="smiles-btn-import" style="padding: 8px 15px; cursor: pointer; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold;">Als Molekül Importieren</button>
-        <button id="smiles-btn-close" style="padding: 8px 15px; cursor: pointer; background: #ccc; border: none; border-radius: 4px; margin-left: 10px;">Schließen</button>
-    </div>
-
-    <div id="hotkeys-dialog" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border:2px solid #333; border-radius:8px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; font-family: sans-serif; width: 300px;">
-        <h3 style="margin-top:0;">Tastenkürzel</h3>
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px; align-items: center;">
-            <label>Kopieren (Strg +)</label><input type="text" id="hk-copy" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
-            <label>Einfügen (Strg +)</label><input type="text" id="hk-paste" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
-            <label>Ausschneiden (Strg +)</label><input type="text" id="hk-cut" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
-            <label>Rückgängig (Strg +)</label><input type="text" id="hk-undo" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
-            <label>Text-Editor</label><input type="text" id="hk-text" maxlength="1" style="width: 40px; text-align: center; text-transform: lowercase;">
+        <button id="btn-style-menu" class="tool-btn" title="Dokument- & Auswahl-Styles"> Styles</button>
+        
+        <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 10px; margin-top: 5px; text-align: center;">
+            <div style="font-size: 11px; color: #6b7280; margin-bottom: 5px;">Chosen atom</div>
+            <span id="current-element-display" style="font-size: 18px; font-weight: 800; color: var(--primary);">C</span>
+            <button id="btn-pse" style="width: 100%; justify-content: center; background: white; border: 1px solid #ddd; margin-top: 8px; font-size: 12px; padding: 4px;">Open PSE</button>
         </div>
-        <button id="hk-btn-save" style="padding: 8px; background: #0088ff; color: white; border: none; border-radius: 4px; font-weight: bold; width: 100%; cursor: pointer;">Speichern</button>
-        <button id="hk-btn-close" style="padding: 8px; margin-top: 5px; background: #ccc; border: none; border-radius: 4px; width: 100%; cursor: pointer;">Abbrechen</button>
     </div>
-    <div id="pse-menu" style="display:none; position:absolute; top:80px; right:20px; background:white; border:2px solid #333; border-radius:8px; padding:15px; box-shadow:0 10px 25px rgba(0,0,0,0.3); z-index:2000; font-family: sans-serif;">
-        <h3 style="margin-top:0; display:flex; justify-content:space-between; align-items:center;">
-            Element wählen
-            <button id="btn-close-pse" style="cursor:pointer; background:none; border:none; font-size:16px; font-weight:bold;">✖</button>
+
+    <canvas id="chemBoard" width="800" height="600"></canvas>
+
+    <div id="custom-text-editor" class="modal" style="display:none; position:absolute; z-index:1000; padding:12px; width: 180px;">
+        <input type="text" id="custom-text-input" placeholder="e.g., OPO_(3)^(2-)" style="margin-bottom: 10px;">
+        <label style="font-size: 12px; cursor: pointer; display: block; margin-bottom: 5px;">
+            <input type="checkbox" id="custom-text-flip"> Align to bond
+        </label>
+        <label style="font-size: 12px; cursor: pointer; display: block; margin-bottom: 10px;">
+            <input type="checkbox" id="custom-text-align"> Align to first letter
+        </label>
+        <button id="custom-text-save" class="btn-primary">Save</button>
+    </div>
+
+    <div id="smiles-dialog" class="modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); padding:25px; width: 400px; z-index:2000;">
+        <h3>SMILES Code in- & export</h3>
+        <input type="text" id="smiles-input" style="font-family: monospace; font-size: 14px; margin-bottom: 15px;" />
+        <button id="smiles-btn-import" class="btn-primary">Import as a molecule</button>
+        <button id="smiles-btn-close" class="btn-secondary">Close</button>
+    </div>
+
+    <div id="hotkeys-dialog" class="modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); padding:25px; width: 320px; z-index:2000;">
+        <h3>Hotkeys</h3>
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px; align-items: center; font-size: 14px;">
+            <label>Copy (Ctrl +)</label><input type="text" id="hk-copy" maxlength="1" style="text-align: center; text-transform: lowercase;">
+            <label>Paste (Ctrl +)</label><input type="text" id="hk-paste" maxlength="1" style="text-align: center; text-transform: lowercase;">
+            <label>Cut (Ctrl +)</label><input type="text" id="hk-cut" maxlength="1" style="text-align: center; text-transform: lowercase;">
+            <label>Undo (Ctrl +)</label><input type="text" id="hk-undo" maxlength="1" style="text-align: center; text-transform: lowercase;">
+            <label>Text Editor</label><input type="text" id="hk-text" maxlength="1" style="text-align: center; text-transform: lowercase;">
+        </div>
+        <button id="hk-btn-save" class="btn-primary">Save</button>
+        <button id="hk-btn-close" class="btn-secondary">Cancel</button>
+    </div>
+    
+    <div id="pse-menu" class="modal" style="display:none; position:absolute; top:80px; left: 200px; padding:20px; z-index:2000;">
+        <h3 style="display:flex; justify-content:space-between; align-items:center;">
+            Periodic system of elements
+            <button id="btn-close-pse" style="padding: 0; width: 24px; height: 24px; justify-content: center;">✖</button>
         </h3>
-        <div id="pse-grid" style="display:grid; grid-template-columns:repeat(18, 30px); grid-template-rows:repeat(7, 30px); gap:2px; font-size: 12px; font-weight: bold; text-align: center; line-height: 30px; cursor: pointer;">
+        <div id="pse-grid" style="display:grid; grid-template-columns:repeat(18, 30px); grid-template-rows:repeat(7, 30px); gap:3px; font-size: 12px; font-weight: bold; text-align: center; line-height: 30px;">
             </div>
     </div>
     
+    <div id="style-panel" class="modal" style="display: none; position: absolute; top: 90px; left: 200px; padding: 20px; width: 240px; z-index: 1000;">
+        <h3>Properties</h3>
+        <div style="margin-bottom: 15px;">
+            <label for="color-picker" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Color (Local/Global):</label>
+            <input type="color" id="color-picker" value="#000000" style="width: 100%; height: 35px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; padding: 2px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label for="bond-spacing-slider" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; font-weight: bold;">
+                <span>Bond Spacing:</span> <span style="font-weight: normal;"><span id="bond-spacing-val">5</span>px</span>
+            </label>
+            <input type="range" id="bond-spacing-slider" min="2" max="12" value="5" style="width: 100%;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label for="font-family-select" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Font Family:</label>
+            <select id="font-family-select" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none;">
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Courier New">Courier</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Verdana">Verdana</option>
+            </select>
+        </div>
+        <button id="btn-close-style-panel" class="btn-secondary">Close</button>
+    </div>
+
     <input type="file" id="file-load" style="display: none;" accept=".chem,.svg">
-    <div id="style-panel" style="display: none; position: absolute; top: 60px; right: 20px; background: #ffffff; border: 1px solid #ccc; border-radius: 8px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); z-index: 1000; width: 220px; font-family: sans-serif;">
-    <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">🎨 Eigenschaften</h3>
     
-    <div style="margin-bottom: 15px;">
-        <label for="color-picker" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Farbe (Lokal/Global):</label>
-        <input type="color" id="color-picker" value="#000000" style="width: 100%; height: 35px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; padding: 2px;">
-    </div>
-
-    <div style="margin-bottom: 15px;">
-        <label for="bond-spacing-slider" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">
-            Abstand Linien: <span id="bond-spacing-val" style="font-weight: normal;">5</span>px
-        </label>
-        <input type="range" id="bond-spacing-slider" min="2" max="12" value="5" style="width: 100%;">
-    </div>
-
-    <div style="margin-bottom: 20px;">
-        <label for="font-family-select" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Schriftart:</label>
-        <select id="font-family-select" style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-            <option value="Arial">Arial</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Courier New">Courier</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Verdana">Verdana</option>
-        </select>
-    </div>
-    
-    <button id="btn-close-style-panel" style="width: 100%; padding: 8px; background: #eeeeee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold;">Schließen</button>
+    <div id="viewer3d-dialog" class="modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); padding:20px; width: 600px; height: 500px; z-index:2000; flex-direction:column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
+    <h3 style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+        3D Structure
+        <button id="btn-close-3d" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #666;">✖</button>
+    </h3>
+    <div id="container-3d" style="flex-grow: 1; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; position: relative; overflow: hidden;"></div>
     </div>
 
     <script>
