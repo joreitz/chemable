@@ -31,3 +31,52 @@
     background: #e0e7ff; /* Leichtes Blau */
     color: #4f46e5;
 }
+
+/* --- KNOWITALL LIVE VIEWER (Glassmorphism) --- */
+#knowitall-glass-panel {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 35px;
+    border-radius: 15px;
+    
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    
+    color: #222;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-align: center;
+    pointer-events: none; 
+    z-index: 1000;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0; 
+}
+
+#knowitall-name { 
+    margin: 0 0 6px 0; 
+    font-size: 20px; 
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #000;
+}
+
+#knowitall-details { 
+    margin: 0; 
+    font-size: 13px; 
+    color: #444; 
+    font-weight: 500;
+}
+
+.xlogp-badge {
+    background: #007bff;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin-left: 8px;
+    font-weight: bold;
+}

@@ -1,12 +1,14 @@
 export let verboose = true;
-if (verboose) {console.log("🚀 Renderer.ts wird geladen...")} ;
+if (verboose) {console.log("Renderer will be loaded...")} ;
 
 import { ChemablePlugin, ChemableContext } from "./plugin-api";
-import { registerPlugin } from "./plugin-manager";
 import { analyzerPlugin } from "./plugins/analyzer";
 import { ehtPlugin } from "./plugins/eht";
+import { knowitallPlugin} from "./plugins/knowitall";
+import { registerPlugin, triggerPluginStateChange } from "./plugin-manager";
 import { ipcRenderer, clipboard, nativeImage } from 'electron';
 registerPlugin(analyzerPlugin);
+registerPlugin(knowitallPlugin);
 
 import { state } from "./state";
 import { Atom, Bond } from "./types";
@@ -119,7 +121,6 @@ function calcTemplatePreview(x: number, y: number) {
     const hitAtom = findAtomNearPosition(x, y, atoms, 20);
     const hitBond = !hitAtom ? getBondAtCoords(x, y, bonds, atoms) : null;
 
-    // 1. Die Basis-Größe des Templates ermitteln (damit es egal ist, ob L=40 oder L=60)
     const tBond0 = pendingTemplate.bonds[0];
     const origA1 = pendingTemplate.atoms.find(a => a.id === tBond0.id1)!;
     const origA2 = pendingTemplate.atoms.find(a => a.id === tBond0.id2)!;
@@ -127,7 +128,6 @@ function calcTemplatePreview(x: number, y: number) {
 
     let scale = currentBondLength / tOrigDist; 
 
-    // 2. Wenn eine Bindung getroffen wird, messen wir diese EXAKT aus (verhindert Verzerrung!)
     if (hitBond) {
         const a1 = atoms.find(a => a.id === hitBond.id1)!;
         const a2 = atoms.find(a => a.id === hitBond.id2)!;
@@ -139,9 +139,11 @@ function calcTemplatePreview(x: number, y: number) {
     const tBonds: Bond[] = pendingTemplate.bonds.map(b => ({ ...b }));
 
     if (hitAtom) {
-        // --- RING AN ATOM ANDOCKEN (Neue Einfachbindung) ---
         templateTargetAtom = hitAtom;
+        
         const rootT = tAtoms[0]; 
+        const rootTx = rootT.x;
+        const rootTy = rootT.y;
         
         const neighbors = bonds
             .filter(b => b.id1 === hitAtom.id || b.id2 === hitAtom.id)
@@ -150,14 +152,11 @@ function calcTemplatePreview(x: number, y: number) {
         
         let targetAngle = 0;
         if (neighbors.length === 0) {
-            // Freies Atom: Ausrichtung in 30° Schritten zur Maus
             const rawAngle = Math.atan2(y - hitAtom.y, x - hitAtom.x);
             targetAngle = Math.round(rawAngle / (Math.PI/6)) * (Math.PI/6);
         } else if (neighbors.length === 1) {
-            // Genau entgegengesetzt zur bestehenden Bindung
             targetAngle = Math.atan2(hitAtom.y - neighbors[0].y, hitAtom.x - neighbors[0].x) + Math.PI;
         } else {
-            // Größte Lücke suchen
             let angles = neighbors.map(n => Math.atan2(n.y - hitAtom.y, n.x - hitAtom.x)).sort((a, b) => a - b);
             let maxGap = 0, bestAngle = 0;
             for(let i=0; i<angles.length; i++) {
@@ -176,12 +175,12 @@ function calcTemplatePreview(x: number, y: number) {
         tAtoms.forEach(a => { cx += a.x; cy += a.y; });
         cx /= tAtoms.length; cy /= tAtoms.length;
         
-        const centerAngle = Math.atan2(cy - rootT.y, cx - rootT.x);
+        const centerAngle = Math.atan2(cy - rootTy, cx - rootTx);
         const rotation = targetAngle - centerAngle;
 
         tAtoms.forEach(a => {
-            const rx = a.x - rootT.x;
-            const ry = a.y - rootT.y;
+            const rx = a.x - rootTx;
+            const ry = a.y - rootTy;
             a.x = attachX + rx * Math.cos(rotation) - ry * Math.sin(rotation);
             a.y = attachY + rx * Math.sin(rotation) + ry * Math.cos(rotation);
         });
@@ -197,29 +196,34 @@ function calcTemplatePreview(x: number, y: number) {
         const tBond = tBonds[0];
         const ta1 = tAtoms.find(a => a.id === tBond.id1)!;
         const ta2 = tAtoms.find(a => a.id === tBond.id2)!;
-        const tAngle = Math.atan2(ta2.y - ta1.y, ta2.x - ta1.x);
+        const ta1x = ta1.x;
+        const ta1y = ta1.y;
+        const ta2x = ta2.x;
+        const ta2y = ta2.y;
 
+        const tAngle = Math.atan2(ta2y - ta1y, ta2x - ta1x);
         const rotation = targetAngle - tAngle;
         
         let cx = 0, cy = 0;
         tAtoms.forEach(a => { cx += a.x; cy += a.y; });
         cx /= tAtoms.length; cy /= tAtoms.length;
 
-        const relCx = cx - ta1.x;
-        const relCy = cy - ta1.y;
+        const relCx = cx - ta1x;
+        const relCy = cy - ta1y;
         const rotCx = relCx * Math.cos(rotation) - relCy * Math.sin(rotation);
         const rotCy = relCx * Math.sin(rotation) + relCy * Math.cos(rotation);
         
         const centerCross = rotCx * targetVec.y - rotCy * targetVec.x;
         const mouseCross = (x - a1.x) * targetVec.y - (y - a1.y) * targetVec.x;
+        
         const needsFlip = Math.sign(mouseCross) !== Math.sign(centerCross);
 
         tAtoms.forEach(a => {
-            let relX = a.x - ta1.x; 
-            let relY = a.y - ta1.y;
+            let relX = a.x - ta1x; 
+            let relY = a.y - ta1y;
             
             if (needsFlip) {
-                const angleT = Math.atan2(ta2.y - ta1.y, ta2.x - ta1.x);
+                const angleT = Math.atan2(ta2y - ta1y, ta2x - ta1x);
                 let rx = relX * Math.cos(-angleT) - relY * Math.sin(-angleT);
                 let ry = relX * Math.sin(-angleT) + relY * Math.cos(-angleT);
                 ry = -ry; 
@@ -266,6 +270,13 @@ function render() {
         ctx.fillStyle = "#007bff";
         ctx.lineWidth = 2;
         
+        if (templateTargetAtom) {
+            ctx.beginPath();
+            ctx.moveTo(templateTargetAtom.x + panX, templateTargetAtom.y + panY);
+            ctx.lineTo(pendingTemplatePreview.atoms[0].x + panX, pendingTemplatePreview.atoms[0].y + panY);
+            ctx.stroke();
+        }
+        
         pendingTemplatePreview.bonds.forEach(b => {
             const a1 = pendingTemplatePreview!.atoms.find(a => a.id === b.id1);
             const a2 = pendingTemplatePreview!.atoms.find(a => a.id === b.id2);
@@ -284,6 +295,7 @@ function render() {
         });
         ctx.restore();
     }
+    triggerPluginStateChange();
 }
 
 // Undo-Funktion
@@ -293,8 +305,6 @@ function performUndo() {
         render();
     }
 }
-
-// --- EVENT LISTENER (MAUS) ---
 
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
