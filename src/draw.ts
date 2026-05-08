@@ -91,15 +91,13 @@ export function drawScene(
     bonds: Bond[],
     options: DrawOptions
 ) {
-    // 1. KANVAS ZURÜCKSETZEN (Fixt das unendliche Verschieben!)
     ctx.resetTransform(); 
     ctx.clearRect(0, 0, width, height);
     
-    // 2. Zustand speichern & Kamera verschieben
     ctx.save(); 
     ctx.translate(options.panX, options.panY);
 
-    // --- RASTER ---
+
     if (options.showGrid) {
         ctx.save();
         ctx.strokeStyle = "#e0e0e0"; 
@@ -131,13 +129,10 @@ export function drawScene(
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#000000";
     ctx.setLineDash([]); 
-    
-    // NEU: 
+     
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // NEU: Wir sortieren die Bindungen vor dem Zeichnen.
-    // Schwarze Bindungen kommen zuerst, alle anderen Farben danach (liegen also drüber).
     const sortedBonds = [...bonds].sort((a, b) => {
         const colorA = a.color || options.globalColor;
         const colorB = b.color || options.globalColor;
@@ -404,6 +399,5 @@ export function drawScene(
         ctx.restore();
     }
 
-    // 3. WICHTIG: Kompletten Zeichenzustand am Ende wieder aufräumen!
     ctx.restore();
 }
