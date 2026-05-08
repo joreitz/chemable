@@ -77,12 +77,11 @@ function insertTemplate(templateName: string) {
 function initTemplates() {
     const container = document.getElementById('template-dropdown');
     if (!container) return;
-    container.innerHTML = ''; // Verhindert doppeltes Einfügen
+    container.innerHTML = ''; 
 
     Object.keys(MOLECULE_TEMPLATES).forEach(name => {
         const btn = document.createElement('button');
         btn.innerText = name;
-        // WICHTIG: Wir übergeben jetzt den NAMEN des Templates, nicht mehr den SMILES String!
         btn.onclick = () => insertTemplate(name);
         container.appendChild(btn);
     });
@@ -95,21 +94,6 @@ document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
     }
     smilesDialog.style.display = 'none';
 });
-
-function copyToOffice() {
-    const atoms = state.getAtoms();
-    const bonds = state.getBonds();
-    const selectedIds = state.getSelectedAtomIds();
-    
-    const svgString = generateSVG(atoms, bonds, selectedIds, currentFontSize);
-    if (!svgString) return;
-
-    clipboard.write({
-        html: svgString,
-        text: svgString 
-    });
-    console.log("Copied to clipboard!");
-}
 
 function openTextEditor(atom: Atom) {
     atomToEdit = atom;
@@ -125,10 +109,6 @@ function openTextEditor(atom: Atom) {
 
 function calcTemplatePreview(x: number, y: number) {
     if (!pendingTemplate) return null;
-    const scale = currentBondLength / 40;
-    
-    const tAtoms: Atom[] = pendingTemplate.atoms.map(a => ({ id: a.id, element: a.element, x: a.x * scale, y: a.y * scale }));
-    const tBonds: Bond[] = pendingTemplate.bonds.map(b => ({ ...b }));
 
     const atoms = state.getAtoms();
     const bonds = state.getBonds();
@@ -139,24 +119,45 @@ function calcTemplatePreview(x: number, y: number) {
     const hitAtom = findAtomNearPosition(x, y, atoms, 20);
     const hitBond = !hitAtom ? getBondAtCoords(x, y, bonds, atoms) : null;
 
-    if (hitAtom) {
-        templateTargetAtom = hitAtom;
-        const rootT = tAtoms[0]; // Das erste Atom des Rings klebt am Zielatom
-        
-        let cx = 0, cy = 0;
-        tAtoms.forEach(a => { cx += a.x; cy += a.y; });
-        cx /= tAtoms.length; cy /= tAtoms.length;
-        const tAngle = Math.atan2(cy - rootT.y, cx - rootT.x);
+    // 1. Die Basis-Größe des Templates ermitteln (damit es egal ist, ob L=40 oder L=60)
+    const tBond0 = pendingTemplate.bonds[0];
+    const origA1 = pendingTemplate.atoms.find(a => a.id === tBond0.id1)!;
+    const origA2 = pendingTemplate.atoms.find(a => a.id === tBond0.id2)!;
+    const tOrigDist = Math.sqrt((origA2.x - origA1.x)**2 + (origA2.y - origA1.y)**2) || 40;
 
+    let scale = currentBondLength / tOrigDist; 
+
+    // 2. Wenn eine Bindung getroffen wird, messen wir diese EXAKT aus (verhindert Verzerrung!)
+    if (hitBond) {
+        const a1 = atoms.find(a => a.id === hitBond.id1)!;
+        const a2 = atoms.find(a => a.id === hitBond.id2)!;
+        const targetDist = Math.sqrt((a2.x - a1.x)**2 + (a2.y - a1.y)**2);
+        scale = targetDist / tOrigDist; 
+    }
+
+    const tAtoms: Atom[] = pendingTemplate.atoms.map(a => ({ id: a.id, element: a.element, x: a.x * scale, y: a.y * scale }));
+    const tBonds: Bond[] = pendingTemplate.bonds.map(b => ({ ...b }));
+
+    if (hitAtom) {
+        // --- RING AN ATOM ANDOCKEN (Neue Einfachbindung) ---
+        templateTargetAtom = hitAtom;
+        const rootT = tAtoms[0]; 
+        
         const neighbors = bonds
             .filter(b => b.id1 === hitAtom.id || b.id2 === hitAtom.id)
             .map(b => atoms.find(a => a.id === (b.id1 === hitAtom.id ? b.id2 : b.id1)))
             .filter((a): a is Atom => !!a);
         
-        let targetAngle = Math.PI / 6; // Standard: 30 Grad
-        if (neighbors.length === 1) {
-            targetAngle = Math.atan2(hitAtom.y - neighbors[0].y, hitAtom.x - neighbors[0].x);
-        } else if (neighbors.length > 1) {
+        let targetAngle = 0;
+        if (neighbors.length === 0) {
+            // Freies Atom: Ausrichtung in 30° Schritten zur Maus
+            const rawAngle = Math.atan2(y - hitAtom.y, x - hitAtom.x);
+            targetAngle = Math.round(rawAngle / (Math.PI/6)) * (Math.PI/6);
+        } else if (neighbors.length === 1) {
+            // Genau entgegengesetzt zur bestehenden Bindung
+            targetAngle = Math.atan2(hitAtom.y - neighbors[0].y, hitAtom.x - neighbors[0].x) + Math.PI;
+        } else {
+            // Größte Lücke suchen
             let angles = neighbors.map(n => Math.atan2(n.y - hitAtom.y, n.x - hitAtom.x)).sort((a, b) => a - b);
             let maxGap = 0, bestAngle = 0;
             for(let i=0; i<angles.length; i++) {
@@ -168,18 +169,28 @@ function calcTemplatePreview(x: number, y: number) {
             targetAngle = bestAngle;
         }
 
-        const rotation = targetAngle - tAngle;
+        const attachX = hitAtom.x + Math.cos(targetAngle) * currentBondLength;
+        const attachY = hitAtom.y + Math.sin(targetAngle) * currentBondLength;
+
+        let cx = 0, cy = 0;
+        tAtoms.forEach(a => { cx += a.x; cy += a.y; });
+        cx /= tAtoms.length; cy /= tAtoms.length;
+        
+        const centerAngle = Math.atan2(cy - rootT.y, cx - rootT.x);
+        const rotation = targetAngle - centerAngle;
+
         tAtoms.forEach(a => {
             const rx = a.x - rootT.x;
             const ry = a.y - rootT.y;
-            a.x = hitAtom.x + rx * Math.cos(rotation) - ry * Math.sin(rotation);
-            a.y = hitAtom.y + rx * Math.sin(rotation) + ry * Math.cos(rotation);
+            a.x = attachX + rx * Math.cos(rotation) - ry * Math.sin(rotation);
+            a.y = attachY + rx * Math.sin(rotation) + ry * Math.cos(rotation);
         });
 
     } else if (hitBond) {
         templateTargetBond = hitBond;
         const a1 = atoms.find(a => a.id === hitBond.id1)!;
         const a2 = atoms.find(a => a.id === hitBond.id2)!;
+        
         const targetVec = { x: a2.x - a1.x, y: a2.y - a1.y };
         const targetAngle = Math.atan2(targetVec.y, targetVec.x);
 
@@ -191,23 +202,21 @@ function calcTemplatePreview(x: number, y: number) {
         const rotation = targetAngle - tAngle;
         
         let cx = 0, cy = 0;
-        tAtoms.forEach(a => {
-            const rx = a.x * Math.cos(rotation) - a.y * Math.sin(rotation);
-            const ry = a.x * Math.sin(rotation) + a.y * Math.cos(rotation);
-            cx += rx; cy += ry;
-        });
+        tAtoms.forEach(a => { cx += a.x; cy += a.y; });
         cx /= tAtoms.length; cy /= tAtoms.length;
 
-        const tcOffsetX = cx - (ta1.x * Math.cos(rotation) - ta1.y * Math.sin(rotation));
-        const tcOffsetY = cy - (ta1.x * Math.sin(rotation) + ta1.y * Math.cos(rotation));
-        const centerCross = tcOffsetX * targetVec.y - tcOffsetY * targetVec.x;
-        const mouseCross = (x - a1.x) * targetVec.y - (y - a1.y) * targetVec.x;
+        const relCx = cx - ta1.x;
+        const relCy = cy - ta1.y;
+        const rotCx = relCx * Math.cos(rotation) - relCy * Math.sin(rotation);
+        const rotCy = relCx * Math.sin(rotation) + relCy * Math.cos(rotation);
         
+        const centerCross = rotCx * targetVec.y - rotCy * targetVec.x;
+        const mouseCross = (x - a1.x) * targetVec.y - (y - a1.y) * targetVec.x;
         const needsFlip = Math.sign(mouseCross) !== Math.sign(centerCross);
 
         tAtoms.forEach(a => {
-            let relX = a.x - ta1.x; let relY = a.y - ta1.y;
-            
+            let relX = a.x - ta1.x; 
+            let relY = a.y - ta1.y;
             
             if (needsFlip) {
                 const angleT = Math.atan2(ta2.y - ta1.y, ta2.x - ta1.x);
@@ -218,14 +227,13 @@ function calcTemplatePreview(x: number, y: number) {
                 relY = rx * Math.sin(angleT) + ry * Math.cos(angleT);
             }
 
-            
             const rotX = relX * Math.cos(rotation) - relY * Math.sin(rotation);
             const rotY = relX * Math.sin(rotation) + relY * Math.cos(rotation);
-            a.x = a1.x + rotX; a.y = a1.y + rotY;
+            a.x = a1.x + rotX; 
+            a.y = a1.y + rotY;
         });
 
     } else {
-        
         let cx = 0, cy = 0;
         tAtoms.forEach(a => { cx += a.x; cy += a.y; });
         cx /= tAtoms.length; cy /= tAtoms.length;
@@ -246,14 +254,14 @@ function render() {
         mousePos: { x: currentMouseX, y: currentMouseY },
         lassoPath: lassoPath,
         selectedAtomIds: state.getSelectedAtomIds(),
-        fontSize: currentFontSize, // <--- NEU
+        fontSize: currentFontSize, 
         globalBondSpacing,
         globalFontFamily,
         globalColor
     });
     if (pendingTemplatePreview) {
         ctx.save();
-        ctx.globalAlpha = 0.4; // Halbtransparent
+        ctx.globalAlpha = 0.4; 
         ctx.strokeStyle = "#007bff";
         ctx.fillStyle = "#007bff";
         ctx.lineWidth = 2;
@@ -293,6 +301,15 @@ canvas.addEventListener('contextmenu', (e) => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
+    
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+        isPanning = true;
+        lastPanMouseX = e.clientX;
+        lastPanMouseY = e.clientY;
+        canvas.style.cursor = "grabbing";
+        return; 
+    }
+
     if (e.button === 2 && pendingTemplate) {
         pendingTemplate = null; pendingTemplatePreview = null;
         render();
@@ -304,14 +321,15 @@ canvas.addEventListener('mousedown', (e) => {
         const idMap = new Map<number, number>();
         const skipAtoms = new Set<number>(); 
         
-        if (templateTargetAtom) {
-            idMap.set(pendingTemplatePreview.atoms[0].id, templateTargetAtom.id);
-            skipAtoms.add(pendingTemplatePreview.atoms[0].id);
-        } else if (templateTargetBond) {
+        if (templateTargetBond) {
             idMap.set(pendingTemplatePreview.bonds[0].id1, templateTargetBond.id1);
             idMap.set(pendingTemplatePreview.bonds[0].id2, templateTargetBond.id2);
             skipAtoms.add(pendingTemplatePreview.bonds[0].id1);
             skipAtoms.add(pendingTemplatePreview.bonds[0].id2);
+            
+            if (pendingTemplatePreview.bonds[0].type > templateTargetBond.type) {
+                templateTargetBond.type = pendingTemplatePreview.bonds[0].type;
+            }
         }
 
         pendingTemplatePreview.atoms.forEach(a => {
@@ -333,6 +351,11 @@ canvas.addEventListener('mousedown', (e) => {
             const exists = state.getBonds().some(ex => (ex.id1 === newId1 && ex.id2 === newId2) || (ex.id1 === newId2 && ex.id2 === newId1));
             if (!exists) state.addBond({ id1: newId1, id2: newId2, type: b.type });
         });
+
+        if (templateTargetAtom) {
+            const rootTemplateAtomId = idMap.get(pendingTemplatePreview.atoms[0].id)!;
+            state.addBond({ id1: templateTargetAtom.id, id2: rootTemplateAtomId, type: 1 });
+        }
 
         pendingTemplate = null;
         pendingTemplatePreview = null;
@@ -422,13 +445,16 @@ canvas.addEventListener('mousedown', (e) => {
 // --- MOUSEMOVE ---
 canvas.addEventListener('mousemove', (e) => {
     
+    const rect = canvas.getBoundingClientRect();
+    currentMouseX = (e.clientX - rect.left) - panX;
+    currentMouseY = (e.clientY - rect.top) - panY;
+
     if (isPanning) {
         panX += e.clientX - lastPanMouseX;
         panY += e.clientY - lastPanMouseY;
         lastPanMouseX = e.clientX;
         lastPanMouseY = e.clientY;
         
-        // Wenn das Textfeld offen ist, schieben wir es mit!
         if (textEditorDiv.style.display === 'block' && atomToEdit) {
             const rect = canvas.getBoundingClientRect();
             textEditorDiv.style.left = (atomToEdit.x + panX + rect.left) + 'px';
@@ -444,11 +470,6 @@ canvas.addEventListener('mousemove', (e) => {
         render();
         return; 
     }
-
-    
-    const rect = canvas.getBoundingClientRect();
-    currentMouseX = (e.clientX - rect.left) - panX;
-    currentMouseY = (e.clientY - rect.top) - panY;
 
     if ((editMode === "draw" || editMode === "arrow") && dragStartAtom) {
         if (editMode === "arrow") {
@@ -930,7 +951,7 @@ document.addEventListener('keydown', (event) => {
         pendingTemplate = null; pendingTemplatePreview = null;
         render();
     }
-    
+
     if (isCtrl && key === hotkeys.copy) { copySelection(); event.preventDefault(); }
     else if (isCtrl && key === hotkeys.paste) { pasteSelection(); event.preventDefault(); }
     else if (isCtrl && key === hotkeys.cut) { cutSelection(); event.preventDefault(); }
@@ -956,7 +977,6 @@ document.addEventListener('keydown', (event) => {
         }
     }
 
-    // 3. Feste Hotkeys für Chemie (+, -, *)
     if (key === '+' || key === '-' || key === '*') {
         const atoms = state.getAtoms();
         const hoveredAtom = findAtomNearPosition(currentMouseX, currentMouseY, atoms, 20);
@@ -1389,67 +1409,6 @@ document.getElementById('smiles-btn-close')?.addEventListener('click', () => {
     smilesDialog.style.display = 'none';
 });
 
-// src/renderer.ts
-
-// src/renderer.ts
-
-// In src/renderer.ts
-
-document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
-    const inputStr = smilesInput.value.trim();
-    if (!inputStr) return;
-
-    state.saveState();
-    
-    // Zentrum berechnen
-    const rect = canvas.getBoundingClientRect();
-    const startX = (rect.width / 2) - panX;
-    const startY = (rect.height / 2) - panY;
-    
-    // 1. SMILES parsen
-    const { atoms: parsedAtoms, bonds: parsedBonds } = parseSmiles(inputStr, startX, startY);
-    
-    // --- DER WICHTIGSTE TEIL: ID-MAPPING ---
-    const idMap = new Map<number, number>();
-    const newAtoms: Atom[] = [];
-
-    parsedAtoms.forEach(a => {
-        const oldId = a.id;
-        const newId = state.getNextId(); 
-        idMap.set(oldId, newId);
-        
-        // Jitter hinzufügen, damit Atome nicht exakt aufeinander liegen
-        const newAtom = { 
-            ...a, 
-            id: newId,
-            x: a.x + (Math.random() - 0.5) * 20,
-            y: a.y + (Math.random() - 0.5) * 20
-        };
-        state.addAtom(newAtom);
-        newAtoms.push(newAtom);
-    });
-
-    // 2. Bindungen mit den NEUEN IDs hinzufügen!
-    parsedBonds.forEach(b => {
-        const realId1 = idMap.get(b.id1);
-        const realId2 = idMap.get(b.id2);
-        
-        if (realId1 !== undefined && realId2 !== undefined) {
-            state.addBond({ 
-                id1: realId1, 
-                id2: realId2,
-                type: b.type // Typ aus SMILES beibehalten (wichtig für Doppelbindungen!)
-            });
-        }
-    });
-
-    // 3. Layout anwenden & UI aufräumen
-    applyAutoLayout(newAtoms, state.getBonds());
-    state.clearSelection(); // Entfernt die lästigen blauen Kreise!
-    
-    smilesDialog.style.display = 'none';
-    render();
-});
 // --- STYLE MENU LOGIK ---
 const stylePanel = document.getElementById('style-panel');
 const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
