@@ -11,7 +11,7 @@ registerPlugin(analyzerPlugin);
 import { state } from "./state";
 import { Atom, Bond } from "./types";
 import { findAtomNearPosition, getBondAtCoords, isPointInPolygon, rotatePoint, centerOfPoints, angleOfMouseMovement } from "./geometry";
-import { applyAutoLayout, applyForceLayout, calculateNewAtomPosition } from "./chemistry";
+import { applyAutoLayout, calculateNewAtomPosition } from "./chemistry";
 import { drawScene } from "./draw";
 import { periodicTable } from "./pse";
 import { elementLayout } from "./pse_layout";
@@ -21,7 +21,13 @@ import 'svg2pdf.js';
 import { generateSmiles, parseSmiles } from './smiles';
 import { init3DViewer } from "./viewer3d";
 import { generateSVG, generateXYZ, convertSdfToXyz } from "./export";
-import { MOLECULE_TEMPLATES } from "./templates";
+import { MOLECULE_TEMPLATES, TemplateData } from "./templates";
+
+//Template Variablen
+let pendingTemplate: TemplateData | null = null;
+let pendingTemplatePreview: { atoms: Atom[], bonds: Bond[] } | null = null;
+let templateTargetAtom: Atom | null = null;
+let templateTargetBond: Bond | null = null;
 
 // Lokale UI-Variablen 
 let editMode: "draw" | "move" | "erase" | "select" | "text" | "arrow" = "draw";
@@ -59,45 +65,36 @@ let globalBondSpacing = 5;
 let globalFontFamily = "Arial";
 let globalColor = "#000000";
 
+function insertTemplate(templateName: string) {
+    pendingTemplate = MOLECULE_TEMPLATES[templateName];
+    if (!pendingTemplate) return;
+    
+    setMode("draw"); 
+    state.clearSelection(); 
+    render();
+}
+
 function initTemplates() {
     const container = document.getElementById('template-dropdown');
     if (!container) return;
+    container.innerHTML = ''; // Verhindert doppeltes Einfügen
 
     Object.keys(MOLECULE_TEMPLATES).forEach(name => {
         const btn = document.createElement('button');
         btn.innerText = name;
-        btn.onclick = () => insertTemplate(MOLECULE_TEMPLATES[name]);
+        // WICHTIG: Wir übergeben jetzt den NAMEN des Templates, nicht mehr den SMILES String!
+        btn.onclick = () => insertTemplate(name);
         container.appendChild(btn);
     });
 }
 
-function insertTemplate(smiles: string) {
-    state.saveState();
-    
-    const rect = canvas.getBoundingClientRect();
-    const { atoms, bonds } = parseSmiles(smiles, rect.width / 2, rect.height / 2);
-    
-    const newIds: number[] = [];
-    const idMap = new Map<number, number>();
-
-    atoms.forEach(a => {
-        const newId = state.getNextId();
-        idMap.set(a.id, newId);
-        state.addAtom({ ...a, id: newId });
-        newIds.push(newId);
-    });
-
-    bonds.forEach(b => {
-        state.addBond({ ...b, id1: idMap.get(b.id1)!, id2: idMap.get(b.id2)! });
-    });
-
-    state.clearSelection();
-    state.selectAtoms(newIds);
-
-    
-    setMode("select");
-    render();
-}
+document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
+    const inputStr = smilesInput.value.trim();
+    if (inputStr) {
+        insertTemplate(inputStr); 
+    }
+    smilesDialog.style.display = 'none';
+});
 
 function copyToOffice() {
     const atoms = state.getAtoms();
@@ -126,6 +123,118 @@ function openTextEditor(atom: Atom) {
     setTimeout(() => textEditorInput.focus(), 10);
 }
 
+function calcTemplatePreview(x: number, y: number) {
+    if (!pendingTemplate) return null;
+    const scale = currentBondLength / 40;
+    
+    const tAtoms: Atom[] = pendingTemplate.atoms.map(a => ({ id: a.id, element: a.element, x: a.x * scale, y: a.y * scale }));
+    const tBonds: Bond[] = pendingTemplate.bonds.map(b => ({ ...b }));
+
+    const atoms = state.getAtoms();
+    const bonds = state.getBonds();
+    
+    templateTargetAtom = null;
+    templateTargetBond = null;
+
+    const hitAtom = findAtomNearPosition(x, y, atoms, 20);
+    const hitBond = !hitAtom ? getBondAtCoords(x, y, bonds, atoms) : null;
+
+    if (hitAtom) {
+        templateTargetAtom = hitAtom;
+        const rootT = tAtoms[0]; // Das erste Atom des Rings klebt am Zielatom
+        
+        let cx = 0, cy = 0;
+        tAtoms.forEach(a => { cx += a.x; cy += a.y; });
+        cx /= tAtoms.length; cy /= tAtoms.length;
+        const tAngle = Math.atan2(cy - rootT.y, cx - rootT.x);
+
+        const neighbors = bonds
+            .filter(b => b.id1 === hitAtom.id || b.id2 === hitAtom.id)
+            .map(b => atoms.find(a => a.id === (b.id1 === hitAtom.id ? b.id2 : b.id1)))
+            .filter((a): a is Atom => !!a);
+        
+        let targetAngle = Math.PI / 6; // Standard: 30 Grad
+        if (neighbors.length === 1) {
+            targetAngle = Math.atan2(hitAtom.y - neighbors[0].y, hitAtom.x - neighbors[0].x);
+        } else if (neighbors.length > 1) {
+            let angles = neighbors.map(n => Math.atan2(n.y - hitAtom.y, n.x - hitAtom.x)).sort((a, b) => a - b);
+            let maxGap = 0, bestAngle = 0;
+            for(let i=0; i<angles.length; i++) {
+                const next = (i+1) % angles.length;
+                let gap = angles[next] - angles[i];
+                if (gap < 0) gap += 2*Math.PI;
+                if (gap > maxGap) { maxGap = gap; bestAngle = angles[i] + gap/2; }
+            }
+            targetAngle = bestAngle;
+        }
+
+        const rotation = targetAngle - tAngle;
+        tAtoms.forEach(a => {
+            const rx = a.x - rootT.x;
+            const ry = a.y - rootT.y;
+            a.x = hitAtom.x + rx * Math.cos(rotation) - ry * Math.sin(rotation);
+            a.y = hitAtom.y + rx * Math.sin(rotation) + ry * Math.cos(rotation);
+        });
+
+    } else if (hitBond) {
+        templateTargetBond = hitBond;
+        const a1 = atoms.find(a => a.id === hitBond.id1)!;
+        const a2 = atoms.find(a => a.id === hitBond.id2)!;
+        const targetVec = { x: a2.x - a1.x, y: a2.y - a1.y };
+        const targetAngle = Math.atan2(targetVec.y, targetVec.x);
+
+        const tBond = tBonds[0];
+        const ta1 = tAtoms.find(a => a.id === tBond.id1)!;
+        const ta2 = tAtoms.find(a => a.id === tBond.id2)!;
+        const tAngle = Math.atan2(ta2.y - ta1.y, ta2.x - ta1.x);
+
+        const rotation = targetAngle - tAngle;
+        
+        let cx = 0, cy = 0;
+        tAtoms.forEach(a => {
+            const rx = a.x * Math.cos(rotation) - a.y * Math.sin(rotation);
+            const ry = a.x * Math.sin(rotation) + a.y * Math.cos(rotation);
+            cx += rx; cy += ry;
+        });
+        cx /= tAtoms.length; cy /= tAtoms.length;
+
+        const tcOffsetX = cx - (ta1.x * Math.cos(rotation) - ta1.y * Math.sin(rotation));
+        const tcOffsetY = cy - (ta1.x * Math.sin(rotation) + ta1.y * Math.cos(rotation));
+        const centerCross = tcOffsetX * targetVec.y - tcOffsetY * targetVec.x;
+        const mouseCross = (x - a1.x) * targetVec.y - (y - a1.y) * targetVec.x;
+        
+        const needsFlip = Math.sign(mouseCross) !== Math.sign(centerCross);
+
+        tAtoms.forEach(a => {
+            let relX = a.x - ta1.x; let relY = a.y - ta1.y;
+            
+            
+            if (needsFlip) {
+                const angleT = Math.atan2(ta2.y - ta1.y, ta2.x - ta1.x);
+                let rx = relX * Math.cos(-angleT) - relY * Math.sin(-angleT);
+                let ry = relX * Math.sin(-angleT) + relY * Math.cos(-angleT);
+                ry = -ry; 
+                relX = rx * Math.cos(angleT) - ry * Math.sin(angleT);
+                relY = rx * Math.sin(angleT) + ry * Math.cos(angleT);
+            }
+
+            
+            const rotX = relX * Math.cos(rotation) - relY * Math.sin(rotation);
+            const rotY = relX * Math.sin(rotation) + relY * Math.cos(rotation);
+            a.x = a1.x + rotX; a.y = a1.y + rotY;
+        });
+
+    } else {
+        
+        let cx = 0, cy = 0;
+        tAtoms.forEach(a => { cx += a.x; cy += a.y; });
+        cx /= tAtoms.length; cy /= tAtoms.length;
+        tAtoms.forEach(a => { a.x = x + (a.x - cx); a.y = y + (a.y - cy); });
+    }
+
+    return { atoms: tAtoms, bonds: tBonds };
+}
+
 function render() {
     drawScene(ctx, canvas.width, canvas.height, state.getAtoms(), state.getBonds(), {
         showValenceWarnings,
@@ -142,6 +251,31 @@ function render() {
         globalFontFamily,
         globalColor
     });
+    if (pendingTemplatePreview) {
+        ctx.save();
+        ctx.globalAlpha = 0.4; // Halbtransparent
+        ctx.strokeStyle = "#007bff";
+        ctx.fillStyle = "#007bff";
+        ctx.lineWidth = 2;
+        
+        pendingTemplatePreview.bonds.forEach(b => {
+            const a1 = pendingTemplatePreview!.atoms.find(a => a.id === b.id1);
+            const a2 = pendingTemplatePreview!.atoms.find(a => a.id === b.id2);
+            if(a1 && a2) {
+                ctx.beginPath();
+                ctx.moveTo(a1.x + panX, a1.y + panY);
+                ctx.lineTo(a2.x + panX, a2.y + panY);
+                ctx.stroke();
+            }
+        });
+        
+        pendingTemplatePreview.atoms.forEach(a => {
+            ctx.beginPath();
+            ctx.arc(a.x + panX, a.y + panY, 4, 0, 2*Math.PI);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
 }
 
 // Undo-Funktion
@@ -159,23 +293,58 @@ canvas.addEventListener('contextmenu', (e) => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
-    // A) PANNING (Verschieben der Arbeitsfläche)
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-        isPanning = true;
-        lastPanMouseX = e.clientX;
-        lastPanMouseY = e.clientY;
-        canvas.style.cursor = "grabbing";
+    if (e.button === 2 && pendingTemplate) {
+        pendingTemplate = null; pendingTemplatePreview = null;
+        render();
         return; 
     }
 
-    // WELT-Koordinaten berechnen (unter Berücksichtigung des Pannings)
+    if (pendingTemplatePreview && e.button === 0) {
+        state.saveState();
+        const idMap = new Map<number, number>();
+        const skipAtoms = new Set<number>(); 
+        
+        if (templateTargetAtom) {
+            idMap.set(pendingTemplatePreview.atoms[0].id, templateTargetAtom.id);
+            skipAtoms.add(pendingTemplatePreview.atoms[0].id);
+        } else if (templateTargetBond) {
+            idMap.set(pendingTemplatePreview.bonds[0].id1, templateTargetBond.id1);
+            idMap.set(pendingTemplatePreview.bonds[0].id2, templateTargetBond.id2);
+            skipAtoms.add(pendingTemplatePreview.bonds[0].id1);
+            skipAtoms.add(pendingTemplatePreview.bonds[0].id2);
+        }
+
+        pendingTemplatePreview.atoms.forEach(a => {
+            if (!skipAtoms.has(a.id)) {
+                const newId = state.getNextId();
+                idMap.set(a.id, newId);
+                state.addAtom({ ...a, id: newId });
+            }
+        });
+
+        pendingTemplatePreview.bonds.forEach(b => {
+            if (templateTargetBond && 
+               ((b.id1 === pendingTemplatePreview!.bonds[0].id1 && b.id2 === pendingTemplatePreview!.bonds[0].id2) || 
+                (b.id1 === pendingTemplatePreview!.bonds[0].id2 && b.id2 === pendingTemplatePreview!.bonds[0].id1))) return;
+
+            const newId1 = idMap.get(b.id1)!;
+            const newId2 = idMap.get(b.id2)!;
+            
+            const exists = state.getBonds().some(ex => (ex.id1 === newId1 && ex.id2 === newId2) || (ex.id1 === newId2 && ex.id2 === newId1));
+            if (!exists) state.addBond({ id1: newId1, id2: newId2, type: b.type });
+        });
+
+        pendingTemplate = null;
+        pendingTemplatePreview = null;
+        render();
+        return;
+    }
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) - panX;
     const y = (e.clientY - rect.top) - panY;
     const atoms = state.getAtoms();
     const bonds = state.getBonds();
 
-    // B) ROTATION (Rechtsklick)
     if (e.button === 2) {
         const selectedIDs = state.getSelectedAtomIds();
         if (selectedIDs.size > 0) {
@@ -194,9 +363,7 @@ canvas.addEventListener('mousedown', (e) => {
         return;
     }
 
-    // C) NORMALE WERKZEUGE (Linksklick)
     if (e.button === 0) {
-        // WICHTIG: IMMER Startkoordinaten speichern, damit mouseup weiß, wie weit gezogen wurde!
         dragStartX = x;
         dragStartY = y;
 
@@ -209,15 +376,12 @@ canvas.addEventListener('mousedown', (e) => {
             return;
         } 
         else if (editMode === "arrow") {
-            // Wir erstellen ein temporäres "Dummy" Atom für den Startpunkt
             dragStartAtom = { id: Date.now(), element: "DUMMY", x, y };
             return;
         }
         else if (editMode === "draw") {
-            // NUR schauen, ob wir auf einem Atom starten. 
             dragStartAtom = findAtomNearPosition(x, y, atoms, 20);
             
-            // Reine Freitext-Elemente dürfen niemals als Startpunkt für Bindungen dienen!
             if (dragStartAtom && dragStartAtom.element === "TEXT") {
                 dragStartAtom = null;
             }
@@ -242,12 +406,10 @@ canvas.addEventListener('mousedown', (e) => {
             const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
             const selectedIDs = state.getSelectedAtomIds();
             
-            // Wenn man auf ein bereits markiertes Atom klickt -> Auswahl verschieben
             if (clickedAtom && selectedIDs.has(clickedAtom.id)) {
                 isDraggingSelection = true;
                 state.saveState();
             } 
-            // Ansonsten -> Neue Lasso-Auswahl starten
             else {
                 state.clearSelection();
                 lassoPath = [{ x, y }];
@@ -259,7 +421,7 @@ canvas.addEventListener('mousedown', (e) => {
 
 // --- MOUSEMOVE ---
 canvas.addEventListener('mousemove', (e) => {
-    // A) PANNING (Muss zuerst kommen!)
+    
     if (isPanning) {
         panX += e.clientX - lastPanMouseX;
         panY += e.clientY - lastPanMouseY;
@@ -277,14 +439,18 @@ canvas.addEventListener('mousemove', (e) => {
         return;
     }
 
-    // WELT-Koordinaten aktualisieren
+    if (pendingTemplate) {
+        pendingTemplatePreview = calcTemplatePreview(currentMouseX, currentMouseY);
+        render();
+        return; 
+    }
+
+    
     const rect = canvas.getBoundingClientRect();
     currentMouseX = (e.clientX - rect.left) - panX;
     currentMouseY = (e.clientY - rect.top) - panY;
 
-    // B) ZEICHNEN (Live-Vorschau mit Snapping)
     if ((editMode === "draw" || editMode === "arrow") && dragStartAtom) {
-        // Pfeile lassen wir einfach frei rotieren (ohne Snapping), das ist meistens schöner.
         if (editMode === "arrow") {
             currentMouseX = currentMouseX; 
         } else if (!e.ctrlKey) {
@@ -302,21 +468,17 @@ canvas.addEventListener('mousemove', (e) => {
         }
         render();
     } 
-    // C) ATOM BEWEGEN
     else if (editMode === "move" && movingAtom) {
         let targetX = currentMouseX;
         let targetY = currentMouseY;
 
-        // Snapping ist aktiv, solange STRG NICHT gedrückt wird
         if (!e.ctrlKey) {
             const bonds = state.getBonds();
             const atoms = state.getAtoms();
             
-            // Finde heraus, wie viele Bindungen an diesem Atom hängen
             const connectedBonds = bonds.filter(b => b.id1 === movingAtom!.id || b.id2 === movingAtom!.id);
 
             if (connectedBonds.length === 1) {
-                // Fall 1: End-Atom -> Wir snappen im 30°-Winkel und fester Länge um den Nachbarn!
                 const neighborId = connectedBonds[0].id1 === movingAtom!.id ? connectedBonds[0].id2 : connectedBonds[0].id1;
                 const neighbor = atoms.find(a => a.id === neighborId);
                 
@@ -324,14 +486,12 @@ canvas.addEventListener('mousemove', (e) => {
                     const dx = currentMouseX - neighbor.x;
                     const dy = currentMouseY - neighbor.y;
                     
-                    // Auf 30° (PI/6) runden
                     const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 6)) * (Math.PI / 6);
                     
                     targetX = neighbor.x + Math.cos(angle) * currentBondLength;
                     targetY = neighbor.y + Math.sin(angle) * currentBondLength;
                 }
             } else {
-                // Fall 2: Mittleres oder freies Atom -> Wir snappen auf ein unsichtbares Raster
                 const snapGrid = 15; // 15px Raster fühlt sich beim freien Bewegen sehr gut an
                 targetX = Math.round(currentMouseX / snapGrid) * snapGrid;
                 targetY = Math.round(currentMouseY / snapGrid) * snapGrid;
@@ -342,7 +502,6 @@ canvas.addEventListener('mousemove', (e) => {
         movingAtom.y = targetY;
         render();
     } 
-    // D) LASSO & AUSWAHL
     else if (editMode === "select") {
         if (isDraggingSelection) {
             const dx = currentMouseX - dragStartX;
@@ -373,7 +532,6 @@ canvas.addEventListener('mousemove', (e) => {
             }
         }
     } 
-    // E) ROTATION
     else if (isRotating) {
         const currentAngle = angleOfMouseMovement({x: currentMouseX, y: currentMouseY}, rotationcenter);
         const startAngle = angleOfMouseMovement({x: dragStartX, y: dragStartY}, rotationcenter);
@@ -399,7 +557,7 @@ canvas.addEventListener('mouseup', (e) => {
     
     if (isPanning) {
         isPanning = false;
-        setMode(editMode); // Cursor wiederherstellen
+        setMode(editMode); 
         return;
     }
     
@@ -407,7 +565,6 @@ canvas.addEventListener('mouseup', (e) => {
     let x = e.clientX - rect.left - panX;
     let y = e.clientY - rect.top - panY;
     
-    // Snapping-Vorschau beim Loslassen anwenden
     if ((editMode === "draw" || editMode === "arrow") && dragStartAtom && !e.ctrlKey) {
         const dx = x - dragStartAtom.x;
         const dy = y - dragStartAtom.y;
@@ -422,14 +579,12 @@ canvas.addEventListener('mouseup', (e) => {
         }
     }
 
-    // 1. VERSCHIEBEN BEENDEN
     if (editMode === "move") {
         if (movingAtom) state.saveState(); 
         movingAtom = null;
         return;
     }
 
-    // 2. SELEKTIEREN BEENDEN
     if (editMode === "select") {
         if (isDraggingSelection) {
             isDraggingSelection = false;
@@ -450,17 +605,14 @@ canvas.addEventListener('mouseup', (e) => {
         return; 
     }
 
-    // 3. RADIERER (Macht nix bei MouseUp)
     if (editMode === "erase") return;
 
-    // ROTATION BEENDEN
     if (isRotating) {
         isRotating = false;
         initialAtomPosition.clear();
         return;
     }
 
-    // 4. ZEICHEN MODUS & PFEILE 
     if (editMode === "draw" || editMode === "arrow") {
         const atoms = state.getAtoms();
         const bonds = state.getBonds();
@@ -469,7 +621,6 @@ canvas.addEventListener('mouseup', (e) => {
         const currentEl = state.getCurrentElement(); 
 
         if (dragStartAtom) {
-            // Sonderfall: Reaktionspfeil
             if (editMode === "arrow") {
                 if (wasDragging) {
                     state.saveState();
@@ -484,16 +635,13 @@ canvas.addEventListener('mouseup', (e) => {
                 return;
             }
 
-            // Normales Zeichnen (Bindung ziehen)
             let dragEndAtom = findAtomNearPosition(x, y, atoms, 20);
 
-            // --- Text-Elemente als Ziel ignorieren ---
             if (dragEndAtom && dragEndAtom.element === "TEXT") {
                 dragEndAtom = null;
             }
 
             if (dragEndAtom && dragEndAtom.id !== dragStartAtom.id) {
-                // A) Verbindung zu existierendem Atom
                 const exists = bonds.some(b => 
                     (b.id1 === dragStartAtom!.id && b.id2 === dragEndAtom.id) || 
                     (b.id1 === dragEndAtom.id && b.id2 === dragStartAtom!.id)
@@ -503,14 +651,12 @@ canvas.addEventListener('mouseup', (e) => {
                     state.addBond({ id1: dragStartAtom.id, id2: dragEndAtom.id, type: currentBondType });
                 }
             } else {
-                // B) Ziehen ins Leere -> Neues Atom + Bindung
                 if (wasDragging) {
                     state.saveState();
                     const newAtom: Atom = { id: state.getNextId(), element: currentEl, x, y };
                     state.addAtom(newAtom);
                     state.addBond({ id1: dragStartAtom.id, id2: newAtom.id, type: currentBondType });
                 } else {
-                    // C) Kurzer Klick auf Atom -> Anbau-Logik (Skelett-Modus)
                     const pos = calculateNewAtomPosition(dragStartAtom, bonds, atoms, currentBondLength);
                     const neighbor = findAtomNearPosition(pos.x, pos.y, atoms, 10); 
                     
@@ -524,7 +670,6 @@ canvas.addEventListener('mouseup', (e) => {
             }
             dragStartAtom = null; // Reset
         } else if (editMode === "draw") {
-            // Wir haben im Leeren gestartet (Klick auf Hintergrund oder Klick auf Bindung)
             const clickedBond = getBondAtCoords(x, y, bonds, atoms);
             
             if (clickedBond && !wasDragging) {
@@ -776,20 +921,21 @@ function cutSelection() {
 // ==========================================
 
 document.addEventListener('keydown', (event) => {
-    // Blockieren, wenn der Nutzer gerade in ein Input-Feld tippt!
     if (event.target instanceof HTMLInputElement) return;
 
-    // Hier wird isCtrl definiert! (Prüft, ob Strg oder die Mac-Command-Taste gedrückt ist)
     const key = event.key.toLowerCase();
     const isCtrl = event.ctrlKey || event.metaKey;
-
-    // 1. Die anpassbaren Hotkeys (mit STRG)
+    
+    if (key === 'escape' && pendingTemplate) {
+        pendingTemplate = null; pendingTemplatePreview = null;
+        render();
+    }
+    
     if (isCtrl && key === hotkeys.copy) { copySelection(); event.preventDefault(); }
     else if (isCtrl && key === hotkeys.paste) { pasteSelection(); event.preventDefault(); }
     else if (isCtrl && key === hotkeys.cut) { cutSelection(); event.preventDefault(); }
     else if (isCtrl && key === hotkeys.undo) { performUndo(); event.preventDefault(); }
     
-    // 2. Die Werkzeug-Hotkeys (OHNE STRG)
     else if (!isCtrl) {
         if (key === hotkeys.draw) { setMode("draw"); }
         else if (key === hotkeys.move) { setMode("move"); }
@@ -1243,25 +1389,67 @@ document.getElementById('smiles-btn-close')?.addEventListener('click', () => {
     smilesDialog.style.display = 'none';
 });
 
+// src/renderer.ts
+
+// src/renderer.ts
+
+// In src/renderer.ts
+
 document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
     const inputStr = smilesInput.value.trim();
-    if (inputStr) {
-        state.saveState();
-        const rect = canvas.getBoundingClientRect();
-        const startX = (rect.width / 2) - panX;
-        const startY = (rect.height / 2) - panY;
-        
-        const { atoms, bonds } = parseSmiles(inputStr, startX, startY);
-        
-        atoms.forEach(a => state.addAtom(a));
-        bonds.forEach(b => state.addBond({ ...b, type: 1 }));
-        applyForceLayout(atoms, state.getBonds(), 200);
-        
-        render();
-    }
-    smilesDialog.style.display = 'none';
-});
+    if (!inputStr) return;
 
+    state.saveState();
+    
+    // Zentrum berechnen
+    const rect = canvas.getBoundingClientRect();
+    const startX = (rect.width / 2) - panX;
+    const startY = (rect.height / 2) - panY;
+    
+    // 1. SMILES parsen
+    const { atoms: parsedAtoms, bonds: parsedBonds } = parseSmiles(inputStr, startX, startY);
+    
+    // --- DER WICHTIGSTE TEIL: ID-MAPPING ---
+    const idMap = new Map<number, number>();
+    const newAtoms: Atom[] = [];
+
+    parsedAtoms.forEach(a => {
+        const oldId = a.id;
+        const newId = state.getNextId(); 
+        idMap.set(oldId, newId);
+        
+        // Jitter hinzufügen, damit Atome nicht exakt aufeinander liegen
+        const newAtom = { 
+            ...a, 
+            id: newId,
+            x: a.x + (Math.random() - 0.5) * 20,
+            y: a.y + (Math.random() - 0.5) * 20
+        };
+        state.addAtom(newAtom);
+        newAtoms.push(newAtom);
+    });
+
+    // 2. Bindungen mit den NEUEN IDs hinzufügen!
+    parsedBonds.forEach(b => {
+        const realId1 = idMap.get(b.id1);
+        const realId2 = idMap.get(b.id2);
+        
+        if (realId1 !== undefined && realId2 !== undefined) {
+            state.addBond({ 
+                id1: realId1, 
+                id2: realId2,
+                type: b.type // Typ aus SMILES beibehalten (wichtig für Doppelbindungen!)
+            });
+        }
+    });
+
+    // 3. Layout anwenden & UI aufräumen
+    applyAutoLayout(newAtoms, state.getBonds());
+    state.clearSelection(); // Entfernt die lästigen blauen Kreise!
+    
+    smilesDialog.style.display = 'none';
+    render();
+});
 // --- STYLE MENU LOGIK ---
 const stylePanel = document.getElementById('style-panel');
 const colorPicker = document.getElementById('color-picker') as HTMLInputElement;

@@ -221,67 +221,80 @@ function recursiveLayout(
     }
 }
 
-export function applyForceLayout(atoms: Atom[], bonds: Bond[], iterations: number = 150) {
+export function applyAutoLayout(atoms: Atom[], bonds: Bond[], iterations: number = 300) {
     if (atoms.length === 0) return;
 
-    const idealDist = 60;   
-    const kRepulsion = 2500; 
-    const kAttraction = 0.08; 
+    const kStretch = 0.5;   // Bindungen ziehen sich an
+    const kRepel = 2000;    // Atome stoßen sich ab
+    const kAngle = 20.0;    // ERZWINGT chemische Winkel (z.B. 120 Grad)
 
     for (let i = 0; i < iterations; i++) {
         const forces = new Map<number, { fx: number, fy: number }>();
         atoms.forEach(a => forces.set(a.id, { fx: 0, fy: 0 }));
 
+        // 1. Abstoßung
         for (let j = 0; j < atoms.length; j++) {
             for (let l = j + 1; l < atoms.length; l++) {
-                const a = atoms[j];
-                const b = atoms[l];
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
-                const distSq = dx * dx + dy * dy || 1;
-                const dist = Math.sqrt(distSq);
-
-                const force = kRepulsion / distSq;
-                const fx = (dx / dist) * force;
-                const fy = (dy / dist) * force;
-
-                forces.get(a.id)!.fx += fx;
-                forces.get(a.id)!.fy += fy;
-                forces.get(b.id)!.fx -= fx;
-                forces.get(b.id)!.fy -= fy;
+                const a = atoms[j]; const b = atoms[l];
+                const dx = a.x - b.x; const dy = a.y - b.y;
+                const d2 = dx * dx + dy * dy || 1;
+                
+                if (d2 < 60000) { 
+                    const f = kRepel / d2;
+                    forces.get(a.id)!.fx += (dx / Math.sqrt(d2)) * f;
+                    forces.get(a.id)!.fy += (dy / Math.sqrt(d2)) * f;
+                    forces.get(b.id)!.fx -= (dx / Math.sqrt(d2)) * f;
+                    forces.get(b.id)!.fy -= (dy / Math.sqrt(d2)) * f;
+                }
             }
         }
 
-        bonds.forEach(bond => {
-            const a = atoms.find(at => at.id === bond.id1);
-            const b = atoms.find(at => at.id === bond.id2);
-            if (!a || !b) return;
+        // 2. Anziehung & Winkel-Spreizung
+        atoms.forEach(pivot => {
+            const connected = bonds.filter(b => b.id1 === pivot.id || b.id2 === pivot.id);
+            const neighbors = connected.map(b => atoms.find(at => at.id === (b.id1 === pivot.id ? b.id2 : b.id1))).filter(n => !!n) as Atom[];
 
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            
-            // Federkraft (Hookesches Gesetz)
-            const targetDist = getIdealBondLength(bond, atoms) || idealDist;
-            const force = (dist - targetDist) * kAttraction;
-            const fx = (dx / dist) * force;
-            const fy = (dy / dist) * force;
+            // Federkraft
+            connected.forEach(b => {
+                const n = atoms.find(at => at.id === (b.id1 === pivot.id ? b.id2 : b.id1));
+                if (!n) return;
+                const dx = n.x - pivot.x; const dy = n.y - pivot.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                const ideal = getIdealBondLength(b, atoms); 
+                const f = (dist - ideal) * kStretch;
+                forces.get(pivot.id)!.fx += (dx / dist) * f;
+                forces.get(pivot.id)!.fy += (dy / dist) * f;
+            });
 
-            forces.get(a.id)!.fx -= fx;
-            forces.get(a.id)!.fy -= fy;
-            forces.get(b.id)!.fx += fx;
-            forces.get(b.id)!.fy += fy;
+            // Winkel erzwingen (Macht aus schiefen Ringen echte Hexagone!)
+            if (neighbors.length >= 2) {
+                for (let j = 0; j < neighbors.length; j++) {
+                    for (let k = j + 1; k < neighbors.length; k++) {
+                        const n1 = neighbors[j]; const n2 = neighbors[k];
+                        const a1 = Math.atan2(n1.y - pivot.y, n1.x - pivot.x);
+                        const a2 = Math.atan2(n2.y - pivot.y, n2.x - pivot.x);
+                        let diff = a1 - a2;
+                        while (diff > Math.PI) diff -= 2*Math.PI;
+                        while (diff < -Math.PI) diff += 2*Math.PI;
+
+                        // Bei zwei Nachbarn wollen wir immer ca. 120 Grad anpeilen
+                        let target = (2 * Math.PI) / neighbors.length;
+                        if (neighbors.length === 2) target = (2 * Math.PI) / 3;
+
+                        const f = (Math.abs(diff) - target) * kAngle;
+                        const pushDir = diff > 0 ? 1 : -1;
+                        forces.get(n1.id)!.fx += Math.cos(a1 + pushDir * 0.5) * f;
+                        forces.get(n1.id)!.fy += Math.sin(a1 + pushDir * 0.5) * f;
+                    }
+                }
+            }
         });
 
+        // 3. Bewegung anwenden
         atoms.forEach(a => {
             const f = forces.get(a.id)!;
-            a.x += Math.max(-15, Math.min(15, f.fx));
-            a.y += Math.max(-15, Math.min(15, f.fy));
+            a.x += Math.max(-5, Math.min(5, f.fx));
+            a.y += Math.max(-5, Math.min(5, f.fy));
         });
     }
-}
-
-// Wir behalten die alte Funktion als Alias bei, damit wir nicht alles umbauen müssen
-export function applyAutoLayout(atoms: Atom[], bonds: Bond[]) {
-    applyForceLayout(atoms, bonds);
 }
