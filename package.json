@@ -1,6 +1,6 @@
 {
   "name": "chemable",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A 2D Chemical Drawing Editor",
   "main": "dist/main.js",
   "repository": {
@@ -45,6 +45,7 @@
     "publish": [
       "github"
     ],
+    "releaseType": "release",
     "extraResources": [
       {
         "from": "bin/${os}",
