@@ -714,10 +714,7 @@
     "covTripleBondRadius": 125,
     "electronegativity": 2.66,
     "valency": [
-      1,
-      3,
-      5,
-      7
+      1
     ],
     "colorValue": "#940094"
   },
@@ -737,7 +734,7 @@
   "Cs":{
     "atomicNumber": 55,
     "elementSymbol": "Cs",
-    "name": "Cesium",
+    "name": "Caesium",
     "covSingleBondRadius": 232,
     "covDoubleBondRadius": 209,
     "covTripleBondRadius": "",

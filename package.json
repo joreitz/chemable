@@ -1,20 +1,20 @@
 {
   "name": "chemable",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "2D Chemical Drawing Editor",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
     "start": "tsc && electron dist/main.js",
     "pack": "tsc && electron-builder --dir",
-    "dist:linux": "tsc && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux"
   },
-  "author": "Dein Name",
+  "author": "Joshua Reitz",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^39.2.4",
-    "electron-builder": "^24.13.3",
-    "typescript": "^5.9.3"
+    "electron": "^42.0.1",
+    "electron-builder": "^26.9.1",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "jspdf": "^4.2.0",

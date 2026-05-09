@@ -23,8 +23,8 @@ function getAdjustedValence(element: string, charge: number, baseValence: number
     if (!charge) return baseValence;
     // Gruppe 14 (C, Si): Ladung reduziert Valenz (C+ = 3 Bindungen, C- = 3 Bindungen + freies Elektronenpaar)
     if (["C", "Si"].includes(element)) return Math.max(0, baseValence - Math.abs(charge));
-    // Gruppen 15, 16, 17: + erhöht Bindigkeit (N+ = 4, O+ = 3), - senkt Bindigkeit (N- = 2, O- = 1)
-    if (["N", "P", "O", "S", "F", "Cl", "Br", "I"].includes(element)) return Math.max(0, baseValence + charge);
+
+    if (["N", "P", "O", "S", "F", "Cl", "Br", "I"].includes(element)) return Math.min(0, baseValence + charge);
     
     return baseValence;
 }
@@ -48,29 +48,26 @@ export function getImplicitHydrogens(atom: Atom, bonds: Bond[]): number {
     return Math.max(0, targetValence - currentBonds);
 }
 
-export function getAtomLabel(atom: Atom, bonds: Bond[], bondOnRight: boolean = false): string {
+export function getAtomLabel(atom: Atom, bonds: Bond[], bondOnRight: boolean = false, showHydrogens: boolean = true): string {
     const hCount = getImplicitHydrogens(atom, bonds);
-    const chargeStr = formatCharge(atom.charge);
     
-    // Für Kohlenstoff
     if (atom.element === "C") {
-        if (atom.charge || atom.radical) {
-            if (hCount === 0) return "C" + chargeStr;
-            if (hCount === 1) return bondOnRight ? "HC" + chargeStr : "CH" + chargeStr;
-            return bondOnRight ? "H" + toSubscript(hCount) + "C" + chargeStr : "CH" + toSubscript(hCount) + chargeStr;
-        } else {
-            if (hCount === 4) return bondOnRight ? "H₄C" : "CH₄";
-            return ""; // Skelett-C bleibt unsichtbar
+        const connectedBonds = bonds.filter(b => b.id1 === atom.id || b.id2 === atom.id).length;
+        if (connectedBonds >= 2 || (connectedBonds === 1 && !atom.charge && !atom.radical)) {
+            return ""; 
         }
+        if (hCount === 0) return "C";
+        if (hCount === 1) return bondOnRight ? "HC" : "CH";
+        return bondOnRight ? "H" + toSubscript(hCount) + "C" : "CH" + toSubscript(hCount);
     }
     
-    // Für alle anderen Heteroatome (O, N, S, etc.)
-    if (hCount === 0) return atom.element + chargeStr;
-    if (hCount === 1) return bondOnRight ? "H" + atom.element + chargeStr : atom.element + "H" + chargeStr;
+    if (!showHydrogens || hCount === 0) return atom.element;
+    
+    if (hCount === 1) return bondOnRight ? "H" + atom.element : atom.element + "H";
     
     return bondOnRight 
-        ? "H" + toSubscript(hCount) + atom.element + chargeStr 
-        : atom.element + "H" + toSubscript(hCount) + chargeStr;
+        ? "H" + toSubscript(hCount) + atom.element
+        : atom.element + "H" + toSubscript(hCount);
 }
 
 export function hasValenceError(atom: Atom, bonds: Bond[]): boolean {

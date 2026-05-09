@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron';
+
+import { app, BrowserWindow, ipcMain } from 'electron'; 
 import * as path from 'path';
 
 function createWindow() {
@@ -15,6 +16,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+
+  ipcMain.handle('get-user-data-path', () => {
+    return app.getPath('userData');
+  });
+
   createWindow();
 
   app.on('activate', () => {

@@ -5,17 +5,26 @@ import { Atom, Bond } from "./types";
 import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
 
-// Ersetzt _() und ^() durch echte Unicode-Sub/Superscripts!
 export function parseChemicalRichText(text: string): string {
-    const subMap: any = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉', '+': '₊', '-': '₋'};
+    const subMap: any = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
     const supMap: any = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹', '+': '⁺', '-': '⁻'};
 
-    let parsed = text.replace(/_\((.*?)\)/g, (_, p1) => p1.split('').map((c: string) => subMap[c]||c).join(''));
+    let parsed = text;
+
+    parsed = parsed.replace(/_\((.*?)\)/g, (_, p1) => p1.split('').map((c: string) => subMap[c]||c).join(''));
     parsed = parsed.replace(/\^\((.*?)\)/g, (_, p1) => p1.split('').map((c: string) => supMap[c]||c).join(''));
+    
+    parsed = parsed.replace(/([A-Za-z\]\)])(\d+)/g, (_, char, digits) => {
+        return char + digits.split('').map((d: string) => subMap[d]).join('');
+    });
+
+    parsed = parsed.replace(/(\d*)([+-])$/, (_, digits, sign) => {
+        return digits.split('').map((d: string) => supMap[d]||d).join('') + supMap[sign];
+    });
+
     return parsed;
 }
 
-// Prüft, ob sich die Bindung rechts vom Atom befindet (dann muss der Text umgedreht werden)
 export function isBondOnRightSide(atom: Atom, bonds: Bond[], atoms: Atom[]): boolean {
     const connected = bonds.filter(b => b.id1 === atom.id || b.id2 === atom.id);
     if (connected.length === 1) { // Ergibt nur Sinn am Ende einer Kette
@@ -43,6 +52,7 @@ export interface DrawOptions {
     globalBondSpacing: number;
     globalFontFamily: string;
     globalColor: string;        
+    showImplicitHydrogens: boolean;
 }
 
 function getNeighborCoords(
@@ -97,7 +107,6 @@ export function drawScene(
     ctx.save(); 
     ctx.translate(options.panX, options.panY);
 
-
     if (options.showGrid) {
         ctx.save();
         ctx.strokeStyle = "#e0e0e0"; 
@@ -126,23 +135,20 @@ export function drawScene(
     }
 
     // --- BINDUNGEN ---
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#000000";
-    ctx.setLineDash([]); 
-     
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.setLineDash([]); 
 
+    //Painter's Algorithm
     const sortedBonds = [...bonds].sort((a, b) => {
-        const colorA = a.color || options.globalColor;
-        const colorB = b.color || options.globalColor;
+        const a1 = atoms.find(x => x.id === a.id1);
+        const a2 = atoms.find(x => x.id === a.id2);
+        const b1 = atoms.find(x => x.id === b.id1);
+        const b2 = atoms.find(x => x.id === b.id2);
         
-        const isBlackA = colorA === "#000000" || colorA.toLowerCase() === "#000";
-        const isBlackB = colorB === "#000000" || colorB.toLowerCase() === "#000";
-        
-        if (isBlackA && !isBlackB) return -1; // A (schwarz) vor B (farbig)
-        if (!isBlackA && isBlackB) return 1;  // B (schwarz) vor A (farbig)
-        return 0;
+        const zA = ((a1?.z || 0) + (a2?.z || 0)) / 2;
+        const zB = ((b1?.z || 0) + (b2?.z || 0)) / 2;
+        return zA - zB; // Was weiter hinten ist (kleineres Z), wird zuerst gezeichnet
     });
 
     for (const bond of sortedBonds) {
@@ -158,40 +164,43 @@ export function drawScene(
         const nx = -dy / len;
         const ny = dx / len;
 
+        // --- 3D TIEFEN-EFFEKTE FÜR BINDUNGEN ---
+        const z1 = a1.z || 0;
+        const z2 = a2.z || 0;
+        const avgZ = (z1 + z2) / 2;
+        
+        ctx.globalAlpha = 1.0; 
+
+        ctx.lineWidth = Math.max(0.5, 2 + (avgZ * 0.06)); 
+
+        let renderType = bond.type;
+
         ctx.strokeStyle = bond.color || options.globalColor;
         let offset = bond.spacing || options.globalBondSpacing;
 
-        if (bond.type === 2 || bond.type === 3) {
-            // Wir übergeben direkt 'bonds' und 'atoms'
+        if (renderType === 2 || renderType === 3) {
             const direction = calculateBondOffsetDirection(a1, a2, bonds, atoms);
             offset = offset * direction; 
         }
 
         ctx.beginPath();
-        if (bond.type === 1) {
+        if (renderType === 1) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             ctx.stroke(); 
-        } else if (bond.type === 2) {
-            // Zähle die Verbindungen der beiden beteiligten Atome
+        } else if (renderType === 2) {
             const a1Connections = bonds.filter(b => b.id1 === a1.id || b.id2 === a1.id).length;
             const a2Connections = bonds.filter(b => b.id1 === a2.id || b.id2 === a2.id).length;
             const isTerminal = a1Connections === 1 || a2Connections === 1;
 
             if (isTerminal) {
-                // Zentrierte Doppelbindung (beide Linien gleich lang und symmetrisch versetzt)
                 const halfOffset = offset / 2;
-                
-                // Linie 1
                 ctx.moveTo(a1.x + nx * halfOffset, a1.y + ny * halfOffset);
                 ctx.lineTo(a2.x + nx * halfOffset, a2.y + ny * halfOffset);
-                
-                // Linie 2
                 ctx.moveTo(a1.x - nx * halfOffset, a1.y - ny * halfOffset);
                 ctx.lineTo(a2.x - nx * halfOffset, a2.y - ny * halfOffset);
                 ctx.stroke();
             } else {
-                // Asymmetrische Doppelbindung für Ringe / Ketten
                 ctx.moveTo(a1.x, a1.y);
                 ctx.lineTo(a2.x, a2.y);
                 const shiftX = nx * offset;
@@ -201,8 +210,9 @@ export function drawScene(
                 const padding = 3; 
                 ctx.moveTo(a1.x + shiftX + ux * padding, a1.y + shiftY + uy * padding);
                 ctx.lineTo(a2.x + shiftX - ux * padding, a2.y + shiftY - uy * padding);
-                ctx.stroke(); }
-            } else if (bond.type === 3) {
+                ctx.stroke(); 
+            }
+        } else if (renderType === 3) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             const o = 4; 
@@ -211,8 +221,7 @@ export function drawScene(
             ctx.moveTo(a1.x - nx * o, a1.y - ny * o);
             ctx.lineTo(a2.x - nx * o, a2.y - ny * o);
             ctx.stroke(); 
-
-        } else if (bond.type === 4) {
+        } else if (renderType === 4) {
             ctx.moveTo(a1.x, a1.y);
             ctx.lineTo(a2.x, a2.y);
             ctx.stroke();
@@ -225,14 +234,9 @@ export function drawScene(
             ctx.moveTo(a2.x, a2.y);
             ctx.lineTo(a2.x - headlen * Math.cos(angle + Math.PI / 6), a2.y - headlen * Math.sin(angle + Math.PI / 6));
             ctx.stroke();
-
-        } else if (bond.type === 5) {
-            // --- KEIL (Wedge) ---
-            const startWidth = 1.0; // Startet auf der Breite der normalen Linie (2px)
-            const endWidth = 5.0; 
-            
-            // Wir verlängern das breite Ende um 2 Pixel, um die "Lücke" 
-            // an Verzweigungen (z.B. Isopropyl) zu schließen.
+        } else if (renderType === 5) {
+            const startWidth = 1.0; 
+            const endWidth = Math.max(3.0, 5.0 + (avgZ * 0.05)); // Keil wird vorne etwas breiter
             const extension = 2.0; 
             const ux = dx / len;
             const uy = dy / len;
@@ -240,35 +244,27 @@ export function drawScene(
             const ey = a2.y + uy * extension;
 
             ctx.fillStyle = bond.color || options.globalColor;
-            ctx.lineJoin = "round"; // Macht die Ecken weicher
+            ctx.lineJoin = "round"; 
             ctx.beginPath();
-            // Startseite (kleines Trapez statt spitzer Punkt)
             ctx.moveTo(a1.x + nx * startWidth, a1.y + ny * startWidth);
             ctx.lineTo(a1.x - nx * startWidth, a1.y - ny * startWidth);
-            // Endseite (breit und leicht verlängert)
             ctx.lineTo(ex - nx * endWidth, ey - ny * endWidth);
             ctx.lineTo(ex + nx * endWidth, ey + ny * endWidth);
             ctx.closePath();
             ctx.fill();
-
-        } else if (bond.type === 6) {
-            // --- GESTRICHELTER KEIL (Dash) ---
-            const hashes = 6; // Etwas weniger Striche für mehr Abstand
-            const startGap = 4.0; // Abstand zum Start-Atom
-            const endGap = 2.0;   // Abstand zum Ziel-Atom
+        } else if (renderType === 6) {
+            const hashes = 6; 
+            const startGap = 4.0; 
+            const endGap = 2.0;   
             const effectiveLen = len - startGap - endGap;
             ctx.fillStyle = bond.color || options.globalColor; 
             ctx.beginPath();
             for (let i = 0; i < hashes; i++) {
                 const step = startGap + (i / (hashes - 1)) * effectiveLen;
                 const fraction = step / len;
-                
                 const cx = a1.x + dx * fraction;
                 const cy = a1.y + dy * fraction;
-                
-                // Breite wächst von schmal nach breit
                 const currentWidth = 1.0 + (4.0 * fraction); 
-                
                 ctx.moveTo(cx + nx * currentWidth, cy + ny * currentWidth);
                 ctx.lineTo(cx - nx * currentWidth, cy - ny * currentWidth);
             }
@@ -277,82 +273,133 @@ export function drawScene(
     }
 
     // --- ATOME ---
-    ctx.font = `bold ${options.fontSize || 16}px Arial`; 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    for (const atom of atoms) {
-        // 1. Pfeil-Anker ignorieren (DUMMY)
+    const sortedAtoms = [...atoms].sort((a, b) => (a.z || 0) - (b.z || 0));
+
+    for (const atom of sortedAtoms) {
         if (atom.element.toUpperCase() === "DUMMY") continue; 
+        
+        //  3D TIEFEN-EFFEKT FÜR ATOME
+        const z = atom.z || 0;
+        ctx.globalAlpha = 1.0;
+        
+        const scale = Math.max(0.7, Math.min(1.3, 1 + (z * 0.005))); // Skalierung
+        const currentFontSize = (options.fontSize || 16) * scale;
+        
         const fontToUse = atom.fontFamily || options.globalFontFamily;
-        ctx.font = `bold ${options.fontSize || 16}px ${fontToUse}`;
-        // 2. Reine Freitext-Elemente zeichnen
-        if (atom.element === "TEXT") {
-            const txt = parseChemicalRichText(atom.customLabel || "");
-            ctx.fillStyle = atom.color || options.globalColor
-            ctx.fillText(txt, atom.x, atom.y);
-            continue; 
-        }
+        ctx.font = `${currentFontSize}px ${fontToUse}`;
         
-        // 3. Normale Atome (und überschriebene Atom-Labels)
-        const bondOnRight = isBondOnRightSide(atom, bonds, atoms);
-        
-        // WICHTIG: Hier geben wir dem customLabel Vorrang!
-        let rawLabel = atom.customLabel || getAtomLabel(atom, bonds, bondOnRight);
-        
-        // Text umdrehen (z.B. OHC statt CHO), falls der Haken im Editor gesetzt war
-        if (atom.customLabel && atom.autoFlip && bondOnRight) {
-            rawLabel = rawLabel.split('').reverse().join('');
+        let label = "";
+        let bondOnRight = false;
+        const isTextElement = (atom.element === "TEXT");
+
+        if (isTextElement) {
+            label = parseChemicalRichText(atom.customLabel || "");
+        } else {
+            bondOnRight = isBondOnRightSide(atom, bonds, atoms);
+            let rawLabel = atom.customLabel || getAtomLabel(atom, bonds, bondOnRight, options.showImplicitHydrogens);
+            if (atom.customLabel && atom.autoFlip && bondOnRight) {
+                rawLabel = rawLabel.split('').reverse().join('');
+            }
+            label = parseChemicalRichText(rawLabel);
         }
 
-        const label = parseChemicalRichText(rawLabel);
         const isHidden = label === "";
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);
         
-        if (isHidden && !isError && options.selectedAtomId !== atom.id) continue;
+        const skipCompletely = isHidden && !isError && options.selectedAtomId !== atom.id && !atom.charge && !atom.radical;
+        if (skipCompletely) continue;
 
         const textWidth = ctx.measureText(label || "C").width;
-        const bgRadiusX = Math.max(12, textWidth / 2 + 4);
-        const bgRadiusY = 13;
+        // Radien werden ebenfalls mit der Tiefe skaliert!
+        const bgRadiusX = Math.max(12 * scale, textWidth / 2 + (4 * scale));
+        const bgRadiusY = 13 * scale; 
         
-        // Verschiebe-Logik für sauberes Andocken von Bindungen an Text
         let shiftX = 0;
-        if ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length)) {
-            const elementWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : atom.element).width;
+        if (!isHidden && ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length))) {
+            const elementWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : (isTextElement ? label.charAt(0) : atom.element)).width;
             const offset = (textWidth / 2) - (elementWidth / 2);
             shiftX = bondOnRight ? -offset : offset;
         }
         
         const drawX = atom.x + shiftX;
 
-        // Roter Warn-Hintergrund
-        if (isError) {
-            ctx.beginPath();
-            ctx.ellipse(drawX, atom.y, bgRadiusX + 4, bgRadiusY + 4, 0, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
-            ctx.fill();
+        if (!isTextElement || isError) {
+            if (isError) {
+                ctx.beginPath();
+                ctx.ellipse(drawX, atom.y, bgRadiusX + (4*scale), bgRadiusY + (4*scale), 0, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+                ctx.fill();
+            }
+            if (!isHidden) {
+                ctx.beginPath();
+                ctx.ellipse(drawX, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fill();
+            }
         }
 
-        // Weißer Atom-Hintergrund (überdeckt Bindungslinien)
-        ctx.beginPath();
-        ctx.ellipse(drawX, atom.y, bgRadiusX, bgRadiusY, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fill();
+        if (!isHidden) {
+            ctx.fillStyle = atom.color || options.globalColor;
+            ctx.fillText(label, drawX, atom.y);
+        }
 
-        // Radikalpunkt
-        if (atom.radical) {
+        if (atom.charge) {
+            const isPositive = atom.charge > 0;
+            const absCharge = Math.abs(atom.charge);
+            const signStr = isPositive ? "+" : "−";
+            
+            let angle = atom.chargeAngle;
+            if (angle === undefined) {
+                angle = isHidden ? -Math.PI / 2 : (bondOnRight ? -Math.PI * 0.8 : -Math.PI * 0.2);
+            }
+
+            const badgeX = drawX + Math.cos(angle) * (bgRadiusX + (5*scale));
+            const badgeY = atom.y + Math.sin(angle) * (bgRadiusY + (5*scale));
+            const badgeRadius = Math.max(7 * scale, currentFontSize * 0.45);
+            
             ctx.beginPath();
-            ctx.arc(drawX + bgRadiusX - 2, atom.y - bgRadiusY + 2, 2.5, 0, Math.PI * 2);
+            ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = atom.color || options.globalColor;
+            ctx.stroke();
+
+            ctx.fillStyle = atom.color || options.globalColor;
+            ctx.font = `bold ${Math.max(10 * scale, currentFontSize * 0.6)}px Arial`;
+            ctx.fillText(signStr, badgeX, badgeY + (1*scale));
+
+            if (absCharge > 1) {
+                ctx.textAlign = "right";
+                ctx.font = `bold ${Math.max(12 * scale, currentFontSize * 0.7)}px Arial`;
+                ctx.fillText(absCharge.toString(), badgeX - badgeRadius - (2*scale), badgeY + (1*scale));
+            }
+            ctx.textAlign = "center"; // Zurücksetzen für das nächste Atom
+        }
+
+        if (atom.radical) {
+            let angle = atom.chargeAngle;
+            if (angle === undefined) {
+                angle = isHidden ? -Math.PI / 2 : (bondOnRight ? -Math.PI * 0.8 : -Math.PI * 0.2);
+            }
+            
+            const distRadiusX = (bgRadiusX + (5*scale)) + (atom.charge ? (14*scale) : 0);
+            const distRadiusY = (bgRadiusY + (5*scale)) + (atom.charge ? (14*scale) : 0);
+            const radX = drawX + Math.cos(angle) * distRadiusX;
+            const radY = atom.y + Math.sin(angle) * distRadiusY;
+            
+            ctx.beginPath();
+            ctx.arc(radX, radY, 2.5 * scale, 0, Math.PI * 2);
             ctx.fillStyle = atom.color || options.globalColor;
             ctx.fill();
         }
+    }
 
-        // Atom-/Text-Label zeichnen
-        if (!isHidden) {
-        ctx.fillStyle = atom.color || options.globalColor;
-        ctx.fillText(label, drawX, atom.y);
-    }
-    }
+    // --- RESET ALPHA FÜR UI-ELEMENTE ---
+    ctx.globalAlpha = 1.0; 
 
     // --- VORSCHAU ---
     if (options.dragStartAtom) {

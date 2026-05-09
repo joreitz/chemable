@@ -1,11 +1,13 @@
 // src/viewer3d.ts
 import { state } from "./state";
 import { generateSmiles } from "./smiles";
+import { applySdfToCanvas } from "./chemistry/optimize-3d"; // NEU: Import
 
-export function init3DViewer() {
+export function init3DViewer(render: () => void) {
     const viewer3dDialog = document.getElementById('viewer3d-dialog');
     const container3d = document.getElementById('container-3d');
     let glViewer: any = null; 
+    let currentSdfData: string | null = null; // NEU: Speichert das geladene SDF
 
     document.getElementById('btn-3d')?.addEventListener('click', async () => {
         const smiles = generateSmiles(state.getAtoms(), state.getBonds());
@@ -14,25 +16,21 @@ export function init3DViewer() {
             return;
         }
 
-        if (viewer3dDialog) {
-            viewer3dDialog.style.display = 'flex';
-        }
-
+        if (viewer3dDialog) viewer3dDialog.style.display = 'flex';
         if (!container3d) return;
+        
         container3d.innerHTML = "<div style='padding:40px; text-align:center; font-family:sans-serif;'>Generating 3D structure...<br><small>Force field optimization in progress</small></div>";
+        currentSdfData = null; // Reset
 
         try {
             const response = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smiles)}/sdf?get3d=true`);
 
-            if (!response.ok) {
-                throw new Error("Could not calculate 3D structure. Is the molecular connectivity (SMILES) valid?");
-            }
+            if (!response.ok) throw new Error("Could not calculate 3D structure. Is the molecular connectivity (SMILES) valid?");
 
             const sdfData = await response.text();
+            currentSdfData = sdfData; 
 
-            // 3Dmol.js Viewer initialisieren
             container3d.innerHTML = ""; 
-            
             const $3Dmol = (window as any).$3Dmol;
             
             glViewer = $3Dmol.createViewer(container3d, { 
@@ -40,7 +38,6 @@ export function init3DViewer() {
                 backgroundColor: 'white' 
             });
 
-            // SDF Modell laden und darstellen
             glViewer.addModel(sdfData, "sdf");
             glViewer.setStyle({}, { 
                 stick: { radius: 0.15, colorscheme: 'Jmol' }, 
@@ -56,8 +53,15 @@ export function init3DViewer() {
         }
     });
 
+    document.getElementById('btn-apply-3d')?.addEventListener('click', () => {
+        if (currentSdfData) {
+            applySdfToCanvas(currentSdfData, render);
+            if (viewer3dDialog) viewer3dDialog.style.display = 'none';
+        }
+    });
+
     document.getElementById('btn-close-3d')?.addEventListener('click', () => {
         if (viewer3dDialog) viewer3dDialog.style.display = 'none';
-        if (glViewer) glViewer.clear(); // RAM freigeben
+        if (glViewer) glViewer.clear(); 
     });
 }

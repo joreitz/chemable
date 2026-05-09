@@ -1,15 +1,22 @@
 export interface Atom {
     id: number;
     element: string;
-    x: number;
-    y: number;
+    x: number;      // 2D-Projektion X
+    y: number;      // 2D-Projektion Y
+    z?: number;     // Aktuelle Tiefe (für Fog & Z-Sorting) 
+    
+    orig3DX?: number;
+    orig3DY?: number;
+    orig3DZ?: number;
+
     charge?: number;
     radical?: boolean;
+    color?: string;
+    fontFamily?: string;
     customLabel?: string;
     autoFlip?: boolean;
     alignFirstLetter?: boolean;
-    color?: string;      // Individuelle Farbe
-    fontFamily?: string; // Individuelle Schriftart   
+    chargeAngle?: number;
 }
 
 export interface Bond {
