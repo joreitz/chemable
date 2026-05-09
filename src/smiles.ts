@@ -1,6 +1,28 @@
 // src/smiles.ts
 import { Atom, Bond } from "./types";
 
+function getSmilesAtomString(atom: Atom): string {
+    if (atom.element.startsWith('[')) return atom.element;
+
+    if (atom.charge || atom.radical) {
+        let chargeStr = "";
+        if (atom.charge) {
+            if (atom.charge === 1) chargeStr = "+";
+            else if (atom.charge === -1) chargeStr = "-";
+            else if (atom.charge > 1) chargeStr = `+${atom.charge}`;
+            else if (atom.charge < -1) chargeStr = `${atom.charge}`; // z.B. "-2"
+        }
+        return `[${atom.element}${chargeStr}]`;
+    }
+
+    const organicSubset = ["B", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"];
+    if (!organicSubset.includes(atom.element)) {
+        return `[${atom.element}]`;
+    }
+
+    return atom.element;
+}
+
 export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
     if (atoms.length === 0) return "";
     
@@ -18,7 +40,6 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
     let smiles = "";
     let ringCounter = 1;
     
-    // Speichert die Ring-Zahlen für jedes Atom (z.B. Atom bekommt Ring "1" und "2")
     const atomRingClosures: Record<number, string[]> = {};
     atoms.forEach(a => atomRingClosures[a.id] = []);
 
@@ -26,7 +47,6 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
     const ringEdges = new Set<Bond>();
     const globalVisited = new Set<number>();
 
-    // SCHRITT 1: Spanning Tree (Hauptbaum) & Ringschlüsse finden
     for (const a of atoms) {
         if (globalVisited.has(a.id) || a.element === "DUMMY" || a.element === "TEXT") continue;
         
@@ -42,7 +62,6 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
                         const rNum = ringCounter++;
                         let rStr = rNum.toString();
                         
-                        // SMILES Syntax: Ringe über 9 werden mit % markiert (wichtig für Fullerene!)
                         if (rNum > 9) rStr = "%" + rStr; 
                         
                         let prefix = "";
@@ -50,7 +69,7 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
                         if (n.bond.type === 3) prefix = "#";
                         
                         atomRingClosures[currId].push(prefix + rStr);
-                        atomRingClosures[n.to.id].push(rStr); // Das Zielatom bekommt nur die Nummer
+                        atomRingClosures[n.to.id].push(rStr); 
                     }
                 } else {
                     treeEdges.add(n.bond);
@@ -67,28 +86,14 @@ export function generateSmiles(atoms: Atom[], bonds: Bond[]): string {
     function dfsPrint(curr: Atom, prev: Atom | null) {
         printed.add(curr.id);
         
-        const organicSubset = new Set(["B", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"]);
-        let elStr = curr.element;
-        
-        const needsBrackets = !organicSubset.has(curr.element) || curr.charge || curr.radical;
-        
-        if (needsBrackets) {
-            let chargeStr = "";
-            if (curr.charge) {
-                chargeStr = curr.charge > 0 ? `+${curr.charge === 1 ? '' : curr.charge}` : `-${curr.charge === -1 ? '' : Math.abs(curr.charge)}`;
-            }
-            elStr = `[${curr.element}${chargeStr}]`;
-        }
-        smiles += elStr;
+        smiles += getSmilesAtomString(curr);
 
-        // Ringschlüsse direkt nach dem Atom anhängen 
         if (atomRingClosures[curr.id].length > 0) {
             smiles += atomRingClosures[curr.id].join('');
         }
 
         const children = adj[curr.id].filter(n => n.to.id !== prev?.id && treeEdges.has(n.bond) && !printed.has(n.to.id));
         
-        // Verzweigungen zeichnen
         for (let i = 0; i < children.length; i++) {
             const isLast = i === children.length - 1;
             if (!isLast) smiles += '(';
@@ -183,7 +188,6 @@ export function parseSmiles(smiles: string, startX: number, startY: number): { a
             i = end + 1;
         } else if (/[a-zA-Z]/.test(char)) {
             let element = char;
-            // Erkennung von Elementen wie Cl, Br (nur wenn erster Buchstabe groß ist)
             if (i + 1 < smiles.length && /[a-z]/.test(smiles[i+1]) && char === char.toUpperCase()) {
                 element += smiles[i+1];
                 i++;
@@ -199,7 +203,7 @@ export function parseSmiles(smiles: string, startX: number, startY: number): { a
             x += 40; y = (y === startY) ? startY + 20 : startY; // Zick-Zack Layout
             i++;
         } else {
-            i++; // Stereochemie (@, \, /) für einfaches 2D ignorieren
+            i++; 
         }
     }
     

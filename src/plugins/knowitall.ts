@@ -2,6 +2,7 @@
 import { ChemablePlugin, ChemableContext } from "../plugin-api";
 import { generateSmiles } from "../smiles";
 import { applySdfToCanvas } from "../chemistry/optimize-3d";
+import { generate2DModelPython } from "../chemistry/rdkit-3d";
 
 const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type;
 const electron = isElectron ? (window as any).require('electron') : null;
@@ -91,7 +92,7 @@ function bindUI(ctx: ChemableContext) {
         const currentSmiles = generateSmiles(ctx.getAtoms(), ctx.getBonds()) || "";
         
         if (val && val !== currentSmiles) {
-            importByCactus(val, ctx);
+            importSmilesDirectly(val, ctx); // DIREKT importieren
         }
         if (smilesDialog) smilesDialog.style.display = 'none';
     });
@@ -123,7 +124,7 @@ function bindUI(ctx: ChemableContext) {
 
             if (terms.length === 0) {
                 resultsList.innerHTML = "<li style='padding:10px;'>Keine Treffer. Versuche direkten Import...</li>";
-                await importByCactus(query, ctx);
+                await importByName(query, ctx);
                 if (dialog) dialog.style.display = 'none';
                 return;
             }
@@ -138,7 +139,7 @@ function bindUI(ctx: ChemableContext) {
                 li.onmouseleave = () => li.style.background = "transparent";
 
                 li.addEventListener('click', () => {
-                    importByCactus(term, ctx);
+                    importByName(term, ctx);
                     if (dialog) dialog.style.display = 'none';
                 });
                 resultsList.appendChild(li);
@@ -151,13 +152,36 @@ function bindUI(ctx: ChemableContext) {
     });
 }
 
-async function importByCactus(query: string, ctx: ChemableContext) {
+async function importSmilesDirectly(smiles: string, ctx: ChemableContext) {
     try {
         document.body.style.cursor = "wait";
-        const res = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(query)}/sdf`);
-        if (!res.ok) throw new Error("Nicht gefunden");
-        const sdf = await res.text();
+        
+        const sdf = await generate2DModelPython(smiles);
+        
         applySdfToCanvas(sdf, ctx.render);
-    } catch (e) { ctx.showMessage("Fehler beim Abruf der Struktur."); }
-    finally { document.body.style.cursor = "default"; }
+        
+    } catch (e) {
+        ctx.showMessage(`Fehler beim SMILES Import: ${(e as Error).message}`);
+    } finally {
+        document.body.style.cursor = "default";
+    }
+}
+
+async function importByName(query: string, ctx: ChemableContext) {
+    try {
+        document.body.style.cursor = "wait";
+        
+        const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(query)}/property/CanonicalSMILES/TXT`);
+        if (!res.ok) throw new Error("Molekül auf PubChem nicht gefunden.");
+        
+        const smiles = (await res.text()).trim();
+        
+        // Den gefundenen SMILES an unsere RDKit-Funktion übergeben
+        await importSmilesDirectly(smiles, ctx);
+
+    } catch (e) { 
+        ctx.showMessage(`Fehler bei der Namenssuche: ${(e as Error).message}`); 
+    } finally { 
+        document.body.style.cursor = "default"; 
+    }
 }

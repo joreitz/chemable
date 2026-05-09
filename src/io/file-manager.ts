@@ -2,8 +2,11 @@
 import { state } from "../state";
 import { uiState } from "../core/ui-state";
 import { generateSmiles } from "../smiles";
+import { generate3DModelPython } from "../chemistry/rdkit-3d";
 import { generateSVG, generateXYZ, convertSdfToXyz } from "../export";
 import { jsPDF } from "jspdf";
+import { clipboard } from "electron";
+import { insertTemplate } from "../chemistry/template-manager"
 import "svg2pdf.js";
 
 export function initFileManager(render: () => void) {
@@ -12,8 +15,8 @@ export function initFileManager(render: () => void) {
     document.getElementById('btn-export-xyz')?.addEventListener('click', async () => {
         const atoms = state.getAtoms();
         const bonds = state.getBonds();
-        
         const smiles = generateSmiles(atoms, bonds);
+        
         if (!smiles) {
             alert("Nothing to export!");
             return;
@@ -21,11 +24,9 @@ export function initFileManager(render: () => void) {
 
         try {
             document.body.style.cursor = "wait";
-            const response = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smiles)}/sdf?get3d=true`);
-
-            if (!response.ok) throw new Error("Error with 3D calculation.");
-
-            const sdfString = await response.text();
+            
+            const sdfString = await generate3DModelPython(smiles);
+            
             const xyzString = convertSdfToXyz(sdfString);
 
             const blob = new Blob([xyzString], { type: "text/plain;charset=utf-8" });
@@ -33,24 +34,14 @@ export function initFileManager(render: () => void) {
             
             const link = document.createElement("a");
             link.href = url;
-            link.download = "molecule_3d.xyz";
+            link.download = "molecule_3d_rdkit.xyz";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
         } catch (err) {
             console.error(err);
-            alert("3D-Export failed: " + (err as Error).message + "\n\nFalling back to 2D export.");
-            
-            const fallbackXyz = generateXYZ(atoms);
-            const blob = new Blob([fallbackXyz], { type: "text/plain;charset=utf-8" });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = "molekuel_2d_planar.xyz";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            alert("RDKit 3D-Export fehlgeschlagen: " + (err as Error).message);
         } finally {
             document.body.style.cursor = "default";
         }
@@ -64,7 +55,7 @@ export function initFileManager(render: () => void) {
 
         const svgString = generateSVG(atoms, bonds, selectedIds, uiState.currentFontSize);
         if (!svgString) {
-            alert("Nichts zum Exportieren vorhanden!");
+            alert("Nothing to export!");
             return;
         }
 
@@ -86,7 +77,7 @@ export function initFileManager(render: () => void) {
 
         const svgString = generateSVG(atoms, bonds, selectedIds, uiState.currentFontSize);
         if (!svgString) {
-            alert("Nichts zum Exportieren vorhanden!");
+            alert("Nothing to export!");
             return;
         }
 
@@ -105,8 +96,8 @@ export function initFileManager(render: () => void) {
             const fileName = selectedIds.size > 0 ? "molekuel_auswahl.pdf" : "molekuel_komplett.pdf";
             doc.save(fileName);
         } catch (err) {
-            console.error("Fehler beim PDF Export:", err);
-            alert("Es gab einen Fehler beim Erstellen des PDFs.");
+            console.error("Error while exporting PDF:", err);
+            alert("There was an error creating the PDF.");
         }
     });
 
@@ -143,7 +134,7 @@ export function initFileManager(render: () => void) {
                     if (match && match[1]) {
                         jsonStr = match[1];
                     } else {
-                        alert("Dieses SVG enthält keine Moleküldaten.");
+                        alert("This SVG does not contain chemable-specific data.");
                         return;
                     }
                 }
@@ -155,10 +146,61 @@ export function initFileManager(render: () => void) {
                     render();
                 }
             } catch (err) {
-                alert("Fehler beim Laden der Datei!");
+                alert("Error while loading file!");
             }
         };
         reader.readAsText(file);
         fileInput.value = ""; 
+    });
+    const smilesDialog = document.getElementById('smiles-dialog');
+    const smilesInput = document.getElementById('smiles-input') as HTMLInputElement;
+
+    document.getElementById('btn-smiles')?.addEventListener('click', () => {
+        const currentSmiles = generateSmiles(state.getAtoms(), state.getBonds());
+        if (smilesInput) smilesInput.value = currentSmiles;
+        if (smilesDialog) smilesDialog.style.display = 'block';
+        smilesInput?.focus();
+        smilesInput?.select();
+    });
+
+    document.getElementById('smiles-btn-close')?.addEventListener('click', () => {
+        if (smilesDialog) smilesDialog.style.display = 'none';
+    });
+
+    document.getElementById('smiles-btn-import')?.addEventListener('click', () => {
+        const inputStr = smilesInput?.value.trim();
+        if (inputStr) {
+            console.log("SMILES will be imported:", inputStr);
+        }
+        if (smilesDialog) smilesDialog.style.display = 'none';
+    });
+
+    smilesInput?.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            const key = e.key.toLowerCase();
+            
+            if (key === 'c') {
+                const start = smilesInput.selectionStart || 0;
+                const end = smilesInput.selectionEnd || smilesInput.value.length;
+                const textToCopy = start !== end ? smilesInput.value.substring(start, end) : smilesInput.value;
+                
+                clipboard.writeText(textToCopy);
+                e.preventDefault();
+            } 
+            else if (key === 'v') {
+                const pasteText = clipboard.readText();
+                const start = smilesInput.selectionStart || 0;
+                const end = smilesInput.selectionEnd || 0;
+                
+                smilesInput.value = smilesInput.value.substring(0, start) + pasteText + smilesInput.value.substring(end);
+                smilesInput.selectionStart = smilesInput.selectionEnd = start + pasteText.length;
+                e.preventDefault();
+            }
+        }
+        
+        // Enter-Taste lädt das Molekül direkt
+        if (e.key === 'Enter') {
+            document.getElementById('smiles-btn-import')?.click();
+        }
     });
 }

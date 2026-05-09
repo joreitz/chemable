@@ -6,6 +6,7 @@ import { analyzerPlugin } from "./plugins/analyzer";
 import { ehtPlugin } from "./plugins/eht";
 import { knowitallPlugin } from "./plugins/knowitall"; // KnowItAll als Plugin laden
 import { registerPlugin, triggerPluginStateChange, setPluginRenderHook } from "./plugin-manager";
+import { initRDKit } from "./chemistry/rdkit-3d";
 
 import { state } from "./state";
 import { drawScene } from "./draw";
@@ -127,7 +128,7 @@ makeDraggable("style-panel");
 
 registerPlugin(analyzerPlugin); 
 
-
+initRDKit();
 init3DViewer(render);
 initToolbar(render, performUndo);
 initMouseHandler(canvas, render);

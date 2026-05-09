@@ -2,54 +2,67 @@
 import { state } from "./state";
 import { generateSmiles } from "./smiles";
 import { applySdfToCanvas } from "./chemistry/optimize-3d"; // NEU: Import
+import { generate3DModelPython } from "./chemistry/rdkit-3d";
+import { generate2DModelPython } from "./chemistry/rdkit-3d";
 
 export function init3DViewer(render: () => void) {
     const viewer3dDialog = document.getElementById('viewer3d-dialog');
     const container3d = document.getElementById('container-3d');
     let glViewer: any = null; 
-    let currentSdfData: string | null = null; // NEU: Speichert das geladene SDF
+    let currentSdfData: string | null = null; 
+
+    document.getElementById('btn-use-on-canvas')?.addEventListener('click', async () => {
+    // 1. Wir holen uns den aktuellen SMILES vom Canvas
+    const smiles = generateSmiles(state.getAtoms(), state.getBonds());
+    if (!smiles) return;
+
+    try {
+        // UI Feedback: Cursor auf Warten setzen
+        document.body.style.cursor = "wait";
+        const btn = document.getElementById('btn-use-on-canvas') as HTMLButtonElement;
+        if (btn) btn.disabled = true;
+
+        const sdfData = await generate2DModelPython(smiles);
+
+        applySdfToCanvas(sdfData, render);
+
+        if (viewer3dDialog) viewer3dDialog.style.display = 'none';
+
+        console.log("3D structure was used.");
+
+    } catch (err) {
+        console.error("Error while transfering to canvas:", err);
+        alert("Transfer failed: " + (err as Error).message);
+    } finally {
+        document.body.style.cursor = "default";
+        const btn = document.getElementById('btn-use-on-canvas') as HTMLButtonElement;
+        if (btn) btn.disabled = false;
+    }
+});
 
     document.getElementById('btn-3d')?.addEventListener('click', async () => {
         const smiles = generateSmiles(state.getAtoms(), state.getBonds());
-        if (!smiles) {
-            alert("Please draw a valid molecule before opening the 3D viewer.");
-            return;
-        }
+        if (!smiles) return alert("Please draw a molecule first.");
 
         if (viewer3dDialog) viewer3dDialog.style.display = 'flex';
         if (!container3d) return;
         
-        container3d.innerHTML = "<div style='padding:40px; text-align:center; font-family:sans-serif;'>Generating 3D structure...<br><small>Force field optimization in progress</small></div>";
-        currentSdfData = null; // Reset
+        container3d.innerHTML = "<div style='padding:40px; text-align:center;'>Generating 3D structure...<br><small>Python RDKit: UFF Optimization running...</small></div>";
 
         try {
-            const response = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(smiles)}/sdf?get3d=true`);
-
-            if (!response.ok) throw new Error("Could not calculate 3D structure. Is the molecular connectivity (SMILES) valid?");
-
-            const sdfData = await response.text();
-            currentSdfData = sdfData; 
-
+            const sdfData = await generate3DModelPython(smiles);
+            
             container3d.innerHTML = ""; 
             const $3Dmol = (window as any).$3Dmol;
-            
-            glViewer = $3Dmol.createViewer(container3d, { 
-                defaultcolors: $3Dmol.rasmolElementColors,
-                backgroundColor: 'white' 
-            });
-
+            glViewer = $3Dmol.createViewer(container3d, { backgroundColor: 'white' });
             glViewer.addModel(sdfData, "sdf");
-            glViewer.setStyle({}, { 
-                stick: { radius: 0.15, colorscheme: 'Jmol' }, 
-                sphere: { scale: 0.3, colorscheme: 'Jmol' } 
-            });
-            
+            glViewer.setStyle({}, { stick: { radius: 0.15 }, sphere: { scale: 0.3 } });
             glViewer.zoomTo();
             glViewer.render();
 
         } catch (err) {
             console.error(err);
-            container3d.innerHTML = `<div style='padding:40px; color:red; text-align:center; font-family:sans-serif;'>Error: ${(err as Error).message}</div>`;
+            container3d.innerHTML = `<div style='padding:40px; color:red; text-align:center;'>Error: ${(err as Error).message}</div>`;
         }
     });
 
