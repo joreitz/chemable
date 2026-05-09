@@ -1,105 +1,105 @@
-
-import { state } from "../state";
+// src/plugins/knowitall.ts
+import { ChemablePlugin, ChemableContext } from "../plugin-api";
 import { generateSmiles } from "../smiles";
 import { applySdfToCanvas } from "../chemistry/optimize-3d";
 
-export function initKnowItAll(render: () => void) {
-    
+// Sicherer Import für Electron-Module
+const electron = (window as any).require ? (window as any).require('electron') : null;
+const fs = (window as any).require ? (window as any).require('fs') : null;
+const path = (window as any).require ? (window as any).require('path') : null;
+
+let smilesDb: Record<string, any> = {};
+let dbLoaded = false;
+let isActive = false;
+
+export const knowitallPlugin: ChemablePlugin = {
+    id: "knowitall-pro",
+    name: "KnowItAll Live",
+    version: "2.5",
+
+    onLoad: (ctx: ChemableContext) => {
+        // 1. Lokale DB laden (Alter Code-Teil)
+        if (electron && fs && path) {
+            try {
+                // Nutzt remote falls vorhanden, sonst fallback auf app
+                const app = electron.remote ? electron.remote.app : electron.app;
+                const userDataPath = app.getPath('userData');
+                const dbPath = path.join(userDataPath, 'smiles_to_name.json');
+                if (fs.existsSync(dbPath)) {
+                    smilesDb = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+                    dbLoaded = true;
+                }
+            } catch (e) { console.warn("KnowItAll: Lokale JSON nicht gefunden."); }
+        }
+
+        // 2. Toolbar & Such-UI Buttons binden
+        bindUI(ctx);
+    },
+
+    execute: async () => {
+        // Toggelt das Info-Panel unten
+        isActive = !isActive;
+        const panel = document.getElementById('plugin-info-area');
+        if (panel) panel.style.display = isActive ? "block" : "none";
+    },
+
+    onStateChange: (ctx: ChemableContext) => {
+        const panel = document.getElementById('plugin-info-area');
+        if (!panel || !isActive) return;
+
+        const smiles = generateSmiles(ctx.getAtoms(), ctx.getBonds());
+        if (!smiles) { panel.innerText = "Bereit..."; return; }
+
+        // Erst lokal suchen, dann SMILES anzeigen
+        const match = dbLoaded ? smilesDb[smiles] : null;
+        if (match) {
+            panel.innerHTML = `<strong>${match.name}</strong> <small>(${match.iupac || 'SMILES Match'})</small>`;
+        } else {
+            panel.innerText = `SMILES: ${smiles}`;
+        }
+    },
+
+    onUnload: () => {}
+};
+
+function bindUI(ctx: ChemableContext) {
+    // Export SMILES
     document.getElementById('btn-export-smiles')?.addEventListener('click', () => {
-        const smiles = generateSmiles(state.getAtoms(), state.getBonds());
+        const smiles = generateSmiles(ctx.getAtoms(), ctx.getBonds());
         if (smiles) {
             navigator.clipboard.writeText(smiles);
-            alert("SMILES kopiert:\n\n" + smiles);
-        } else {
-            alert("Fehler: Konnte keinen SMILES generieren. Ist das Canvas leer?");
+            ctx.showMessage("SMILES kopiert!");
         }
     });
 
+    // Import SMILES
     document.getElementById('btn-import-smiles')?.addEventListener('click', () => {
-        const smiles = prompt("Bitte SMILES-Code einfügen:");
-        if (smiles) importIdentifierToCanvas(smiles, render);
+        const smiles = prompt("SMILES einfügen:");
+        if (smiles) importByCactus(smiles, ctx);
     });
 
+    // KnowItAll Suche (Dialog)
     const dialog = document.getElementById('knowitall-dialog');
-    const input = document.getElementById('knowitall-input') as HTMLInputElement;
-    const searchBtn = document.getElementById('knowitall-search-btn');
-    const resultsList = document.getElementById('knowitall-results');
-
     document.getElementById('btn-knowitall')?.addEventListener('click', () => {
         if (dialog) dialog.style.display = 'block';
-        input.focus();
     });
-
     document.getElementById('btn-close-knowitall')?.addEventListener('click', () => {
         if (dialog) dialog.style.display = 'none';
     });
 
+    // Such-Logik im Fenster
+    const searchBtn = document.getElementById('knowitall-search-btn');
+    const input = document.getElementById('knowitall-input') as HTMLInputElement;
     searchBtn?.addEventListener('click', async () => {
-        const query = input.value.trim();
-        if (!query || !resultsList) return;
-
-        resultsList.innerHTML = "<li style='padding:10px; color:#666;'>Suche in PubChem läuft...</li>";
-
-        try {
-            const res = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/${encodeURIComponent(query)}/json`);
-            const data = await res.json();
-            const terms = data.dictionary_terms?.compound || [];
-
-            resultsList.innerHTML = "";
-
-            if (terms.length === 0) {
-                resultsList.innerHTML = "<li style='padding:10px; color:#666;'>Keine direkten Treffer. Versuche exakten Import...</li>";
-                await importIdentifierToCanvas(query, render);
-                if (dialog) dialog.style.display = 'none';
-                return;
-            }
-
-            terms.slice(0, 15).forEach((term: string) => {
-                const li = document.createElement('li');
-                li.innerText = term;
-                li.style.padding = "8px 10px";
-                li.style.borderBottom = "1px solid #f0f0f0";
-                li.style.cursor = "pointer";
-                li.style.transition = "background 0.2s";
-                
-                li.addEventListener('mouseenter', () => li.style.background = "#e6f2ff");
-                li.addEventListener('mouseleave', () => li.style.background = "transparent");
-
-                li.addEventListener('click', () => {
-                    resultsList.innerHTML = `<li style='padding:10px; color:#007bff;'>Lade 2D-Struktur für "${term}"...</li>`;
-                    importIdentifierToCanvas(term, render);
-                    if (dialog) dialog.style.display = 'none';
-                });
-                
-                resultsList.appendChild(li);
-            });
-
-        } catch (err) {
-            resultsList.innerHTML = "<li style='padding:10px; color:red;'>Fehler bei der Verbindung zur Datenbank.</li>";
-        }
-    });
-
-
-    input?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') searchBtn?.click();
+        if (input.value) importByCactus(input.value, ctx);
     });
 }
 
-
-async function importIdentifierToCanvas(identifier: string, render: () => void) {
+async function importByCactus(query: string, ctx: ChemableContext) {
     try {
-        document.body.style.cursor = "wait";
-        
-        const res = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(identifier)}/sdf`);
-        if (!res.ok) throw new Error("Struktur konnte in der Datenbank nicht gefunden werden.");
-        
-        const sdfString = await res.text();
-        
-        applySdfToCanvas(sdfString, render);
-        
-    } catch (err) {
-        alert("Fehler beim Import: " + (err as Error).message);
-    } finally {
-        document.body.style.cursor = "default";
-    }
+        const res = await fetch(`https://cactus.nci.nih.gov/chemical/structure/${encodeURIComponent(query)}/sdf`);
+        if (!res.ok) throw new Error("Nicht gefunden");
+        const sdf = await res.text();
+        applySdfToCanvas(sdf, ctx.render);
+    } catch (e) { ctx.showMessage("Fehler beim Abruf der Struktur."); }
 }

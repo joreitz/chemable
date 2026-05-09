@@ -80,3 +80,20 @@
     margin-left: 8px;
     font-weight: bold;
 }
+
+/* style.css */
+#knowitall-dialog {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    padding: 20px;
+    border: 1px solid #ccc;
+}
+
+#knowitall-results li {
+    padding: 8px;
+    cursor: pointer;
+}
+#knowitall-results li:hover {
+    background: #f0f0f0;
+}

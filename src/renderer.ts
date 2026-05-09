@@ -4,9 +4,8 @@ if (verboose) { console.log("Renderer will be loaded...") };
 // --- IMPORTS ---
 import { analyzerPlugin } from "./plugins/analyzer";
 import { ehtPlugin } from "./plugins/eht";
-import { initKnowItAll } from "./plugins/knowitall";
-import { registerPlugin, triggerPluginStateChange } from "./plugin-manager";
-registerPlugin(analyzerPlugin);
+import { knowitallPlugin } from "./plugins/knowitall"; // KnowItAll als Plugin laden
+import { registerPlugin, triggerPluginStateChange, setPluginRenderHook } from "./plugin-manager";
 
 import { state } from "./state";
 import { drawScene } from "./draw";
@@ -116,13 +115,19 @@ function resizeCanvas() {
 
 window.addEventListener('resize', resizeCanvas);
 
+setPluginRenderHook(render);
+registerPlugin(knowitallPlugin);
+
 // UI Draggables
 makeDraggable("menubar");
 makeDraggable("toolbar");
 makeDraggable("pse-menu");
 makeDraggable("style-panel");
 
-// Module starten
+
+registerPlugin(analyzerPlugin); 
+
+
 init3DViewer(render);
 initToolbar(render, performUndo);
 initMouseHandler(canvas, render);
@@ -132,6 +137,5 @@ initTemplateMenu(render);
 initTextEditor(render);
 initPSEMenu();
 initStyleMenu(render);
-initKnowItAll(render);
-// Erster Start
+
 resizeCanvas();
