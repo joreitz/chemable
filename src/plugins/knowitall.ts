@@ -158,7 +158,7 @@ async function importSmilesDirectly(smiles: string, ctx: ChemableContext) {
         
         const sdf = await generate2DModelPython(smiles);
         
-        applySdfToCanvas(sdf, ctx.render);
+        applySdfToCanvas(sdf, ctx.render, true);
         
     } catch (e) {
         ctx.showMessage(`Fehler beim SMILES Import: ${(e as Error).message}`);
@@ -176,7 +176,6 @@ async function importByName(query: string, ctx: ChemableContext) {
         
         const smiles = (await res.text()).trim();
         
-        // Den gefundenen SMILES an unsere RDKit-Funktion übergeben
         await importSmilesDirectly(smiles, ctx);
 
     } catch (e) { 

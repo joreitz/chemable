@@ -70,7 +70,20 @@ export function getAtomLabel(atom: Atom, bonds: Bond[], bondOnRight: boolean = f
         : atom.element + "H" + toSubscript(hCount);
 }
 
+export function isTransitionMetal(element: string): boolean {
+    const metals = [
+        "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+        "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd",
+        "La", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
+        "Al", "Ga", "In", "Sn", "Pb", "Bi"
+    ];
+    return metals.includes(element);
+}
+
 export function hasValenceError(atom: Atom, bonds: Bond[]): boolean {
+    if (isTransitionMetal(atom.element)) {
+        return false; 
+    }
     const data = periodicTable[atom.element];
     if (!data) return false;
     
@@ -81,7 +94,6 @@ export function hasValenceError(atom: Atom, bonds: Bond[]): boolean {
     let currentBonds = 0;
     for (const bond of bonds) {
         if (bond.id1 === atom.id || bond.id2 === atom.id) {
-            // FIX: Auch hier! Keile und Dashes sind Einfachbindungen!
             if (bond.type === 5 || bond.type === 6) currentBonds += 1;
             else if (bond.type !== 4) currentBonds += bond.type;
         }

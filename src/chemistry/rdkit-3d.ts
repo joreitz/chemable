@@ -12,7 +12,7 @@ export function initRDKit() {
             locateFile: () => "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.wasm"
         }).then((instance: any) => {
             RDKit = instance;
-            console.log("✅ RDKit 2D-Engine geladen!");
+            console.log("RDKit loaded!");
         });
     }
 }
@@ -23,7 +23,6 @@ export async function generate2DModelPython(smiles: string): Promise<string> {
             const cleanSmiles = smiles.trim().replace(/^SMILES=/i, "");
             const pythonScriptPath = path.join(__dirname, '../../engine_3d.py'); 
             
-            // ACHTUNG: Wir schicken hier "2d" als letztes Argument an Python!
             const { stdout, stderr } = await execAsync(`python "${pythonScriptPath}" "${cleanSmiles}" "2d"`);
             
             if (stderr && stderr.includes("ERROR")) {

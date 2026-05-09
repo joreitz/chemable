@@ -1,7 +1,9 @@
 // src/ui/toolbar.ts
 import { uiState } from "../core/ui-state";
 import { state } from "../state";
-import { applyAutoLayout } from "../chemistry";
+import { generate2DModelPython } from "../chemistry/rdkit-3d";
+import { applySdfToCanvas } from "../chemistry/optimize-3d"
+import { generateSmiles } from "../smiles";
 
 export function setMode(mode: any, activeBtnId?: string) {
         uiState.editMode = mode;
@@ -99,20 +101,24 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         render();
     });
 
-    // Clean (Auto-Layout)
-    document.getElementById('btn-clean')?.addEventListener('click', () => {
-        state.saveState();
-        const allAtoms = state.getAtoms();
-        const allBonds = state.getBonds();
-        const selectedIds = state.getSelectedAtomIds();
-
-        if (selectedIds.size > 0) {
-            const selectedAtoms = allAtoms.filter(a => selectedIds.has(a.id));
-            applyAutoLayout(selectedAtoms, allBonds);
-        } else {
-            applyAutoLayout(allAtoms, allBonds);
+    document.getElementById('btn-clean')?.addEventListener('click', async () => {
+        const smiles = generateSmiles(state.getAtoms(), state.getBonds());
+        if (!smiles) {
+            alert("Das Zeichenbrett ist leer.");
+            return;
         }
-        render();
+        
+        try {
+            document.body.style.cursor = "wait";
+            const cleanSdf = await generate2DModelPython(smiles);
+            
+            applySdfToCanvas(cleanSdf, render, false); 
+            
+        } catch (e) {
+            alert("Cleanup fehlgeschlagen: " + (e as Error).message);
+        } finally {
+            document.body.style.cursor = "default";
+        }
     });
 
     // Charges

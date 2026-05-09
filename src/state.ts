@@ -16,15 +16,20 @@ export const state = {
     getBonds: () => bonds,
     getCurrentElement: () => currentElement,
     
-    // Generiert eine ID und zählt hoch
     getNextId: () => nextId++, 
 
-    // 2. Setter (Daten schreiben)
-    setAtoms: (newAtoms: Atom[]) => { atoms = newAtoms; },
+    setAtoms: (newAtoms: Atom[]) => { 
+        atoms = newAtoms; 
+        
+        let maxId = 0;
+        atoms.forEach(a => { if (a.id > maxId) maxId = a.id; });
+        if (maxId >= nextId) {
+            nextId = maxId + 1;
+        }
+    },
     setBonds: (newBonds: Bond[]) => { bonds = newBonds; },
     setCurrentElement: (el: string) => { currentElement = el; },
 
-    // Komfort-Funktionen zum Hinzufügen
     addAtom: (atom: Atom) => { atoms.push(atom); },
     addBond: (bond: Bond) => { bonds.push(bond); },
 
@@ -32,10 +37,7 @@ export const state = {
     // HISTORY & MANAGEMENT
     // ----------------------------
 
-    // Zustand sichern (vor jeder Änderung aufrufen!)
     saveState: () => {
-        // WICHTIG: Wir brauchen eine "Deep Copy", sonst speichern wir nur Referenzen,
-        // die sich später mit verändern. JSON.parse/stringify ist der einfachste Weg dafür.
         const snapshot: EditorState = {
             atoms: JSON.parse(JSON.stringify(atoms)),
             bonds: JSON.parse(JSON.stringify(bonds)),

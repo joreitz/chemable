@@ -1,33 +1,59 @@
+// src/chemistry/optimize-3d.ts
 import { state } from "../state";
 import { Atom, Bond } from "../types";
 
-export function applySdfToCanvas(sdfString: string, render: () => void) {
-    const oldAtoms = state.getAtoms();
+export function applySdfToCanvas(sdfString: string, render: () => void, merge: boolean = false) {
+    const oldAtoms = merge ? [...state.getAtoms()] : [];
+    const oldBonds = merge ? [...state.getBonds()] : [];
 
     try {
-        const lines = sdfString.split('\n');
-        const countsLine = lines[3];
-        if (!countsLine) throw new Error("Ungültiges SDF Format");
+        // OHNE .trim() am Anfang, damit absichtliche Leerzeilen im Header nicht kaputtgehen!
+        const lines = sdfString.split(/\r?\n/);
+        
+        // --- BULLETPROOF FIX ---
+        // Wir suchen die Zeile mit der Atomanzahl dynamisch (sie endet fast immer auf V2000)
+        let countsLineIdx = 3; // Standard-Annahme
+        for (let i = 0; i < Math.min(10, lines.length); i++) {
+            if (lines[i].includes("V2000") || lines[i].includes("V3000")) {
+                countsLineIdx = i;
+                break;
+            }
+        }
+
+        const countsLine = lines[countsLineIdx];
+        if (!countsLine || countsLine.length < 6) throw new Error("Ungültiges SDF Format: Counts-Line fehlt.");
 
         const numAtoms = parseInt(countsLine.substring(0, 3).trim());
         const numBonds = parseInt(countsLine.substring(3, 6).trim());
 
-        const tempAtoms: any[] = [];
-        const tempBonds: any[] = [];
+        if (isNaN(numAtoms) || isNaN(numBonds)) {
+            throw new Error(`Atomanzahl konnte nicht ermittelt werden. (Gelesene Zeile: ${countsLine})`);
+        }
+
+        let tempAtoms: any[] = [];
+        let tempBonds: any[] = [];
         const scale = 40; 
 
-        let offset = 4;
+        // Die Atome starten immer exakt EINE Zeile unter der Counts-Line
+        let offset = countsLineIdx + 1; 
+        let sumX = 0, sumY = 0, sumZ = 0;
+
         for (let i = 0; i < numAtoms; i++) {
             const line = lines[offset + i];
             const x = parseFloat(line.substring(0, 10).trim());
             const y = parseFloat(line.substring(10, 20).trim());
             const z = parseFloat(line.substring(20, 30).trim());
             const element = line.substring(31, 34).trim();
+            
+            sumX += x; sumY += y; sumZ += z;
             tempAtoms.push({ id: i + 1, element, x, y, z });
         }
 
+        const avgX = sumX / numAtoms;
+        const avgY = sumY / numAtoms;
+        const avgZ = sumZ / numAtoms;
+
         offset += numAtoms;
-        
         for (let i = 0; i < numBonds; i++) {
             const line = lines[offset + i];
             const id1 = parseInt(line.substring(0, 3).trim());
@@ -39,53 +65,64 @@ export function applySdfToCanvas(sdfString: string, render: () => void) {
         const newAtoms: Atom[] = [];
         const newBonds: Bond[] = [];
         const idMap = new Map<number, number>();
-        let newIdCounter = 1;
+        
+        const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
+        const centerX = canvas ? canvas.width / 2 : 400;
+        const centerY = canvas ? canvas.height / 2 : 300;
+
+        let shiftX = 0;
+        if (merge && oldAtoms.length > 0) {
+            let maxOldX = -Infinity;
+            oldAtoms.forEach(a => { if (a.x > maxOldX) maxOldX = a.x; });
+            shiftX = (maxOldX + 150) - centerX;
+            if (shiftX < 0) shiftX = 0; 
+        }
 
         for (const a of tempAtoms) {
             if (a.element.toUpperCase() === 'H') continue; 
+            
+            const newId = state.getNextId(); 
+            idMap.set(a.id, newId);
+
+            const locX = (a.x - avgX) * scale;
+            const locY = (a.y - avgY) * scale;
+            const locZ = (a.z - avgZ) * scale;
+
+            const finalX = centerX + locX + shiftX;
+            const finalY = centerY - locY;
+            const finalZ = -locZ;
+
             newAtoms.push({
-                id: newIdCounter, element: a.element,
-                x: a.x * scale, y: -a.y * scale, z: -a.z * scale,
-                orig3DX: a.x * scale, orig3DY: -a.y * scale, orig3DZ: -a.z * scale
+                id: newId,
+                element: a.element,
+                
+                x: finalX,
+                y: finalY, 
+                z: finalZ,
+                
+                orig3DX: finalX,
+                orig3DY: finalY,
+                orig3DZ: finalZ
             });
-            idMap.set(a.id, newIdCounter); 
-            newIdCounter++;
         }
 
         for (const b of tempBonds) {
             const newId1 = idMap.get(b.id1);
             const newId2 = idMap.get(b.id2);
-            if (newId1 && newId2) newBonds.push({ id1: newId1, id2: newId2, type: b.type });
-        }
-
-        let targetCx = 0, targetCy = 0;
-        if (oldAtoms.length > 0) {
-            oldAtoms.forEach(a => { targetCx += a.x; targetCy += a.y; });
-            targetCx /= oldAtoms.length; targetCy /= oldAtoms.length;
-        } else {
-            const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
-            targetCx = canvas ? canvas.width / 2 : 400;
-            targetCy = canvas ? canvas.height / 2 : 300;
-        }
-
-        let newCx = 0, newCy = 0;
-        if (newAtoms.length > 0) {
-            newAtoms.forEach(a => { newCx += a.x; newCy += a.y; });
-            newCx /= newAtoms.length; newCy /= newAtoms.length;
-            const dx = targetCx - newCx; const dy = targetCy - newCy;
-            newAtoms.forEach(a => {
-                a.x += dx; a.y += dy;
-                a.orig3DX! += dx; a.orig3DY! += dy;
-            });
+            if (newId1 && newId2) {
+                newBonds.push({ id1: newId1, id2: newId2, type: b.type });
+            }
         }
 
         state.saveState();
-        state.setAtoms(newAtoms);
-        state.setBonds(newBonds);
+        state.setAtoms([...oldAtoms, ...newAtoms]);
+        state.setBonds([...oldBonds, ...newBonds]);
+        
+        state.clearSelection(); 
         render();
 
     } catch (err) {
-        console.error(err);
-        alert("Error with the structure: " + (err as Error).message);
+        console.error("Vollständiger Fehler:", err);
+        alert("SDF Import fehlgeschlagen: " + (err as Error).message);
     }
 }
