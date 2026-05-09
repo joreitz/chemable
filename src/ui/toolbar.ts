@@ -45,6 +45,17 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         });
         render();
     });
+    document.getElementById('btn-toggle-3d')?.addEventListener('click', (e) => {
+    // Globalen State umkehren
+    state.set3DMode(!state.is3DMode); 
+    
+    // Button-Text anpassen
+    const btn = e.target as HTMLButtonElement;
+    btn.innerText = state.is3DMode ? "2D Modus" : "3D Modus";
+    
+    // Canvas neu zeichnen
+    render(); 
+    });
 
     // --- AKTIONEN ---
     document.getElementById('btn-clear')?.addEventListener('click', () => { state.clear(); render(); });

@@ -7,6 +7,7 @@ let nextId = 1;
 let currentElement = "C";
 let selectedAtomIDs = new Set<number>();
 let historyState: EditorState[] = [];
+let is3DMode = false;
 
 // --- PUBLIC INTERFACE ---
 export const state = {
@@ -80,7 +81,9 @@ export const state = {
         return true; // Signalisiert: "Daten geändert, bitte neu zeichnen!"
     },
 
-    // Alles löschen
+    get is3DMode() { return is3DMode; },
+    set3DMode: (val: boolean) => { is3DMode = val; },
+    
     clear: () => {
         state.saveState(); // Erst sichern!
         atoms = [];

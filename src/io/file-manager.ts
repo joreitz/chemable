@@ -41,7 +41,7 @@ export function initFileManager(render: () => void) {
 
         } catch (err) {
             console.error(err);
-            alert("RDKit 3D-Export fehlgeschlagen: " + (err as Error).message);
+            alert("RDKit 3D-Export didn't work: " + (err as Error).message);
         } finally {
             document.body.style.cursor = "default";
         }

@@ -12,27 +12,33 @@ export function init3DViewer(render: () => void) {
     let currentSdfData: string | null = null; 
 
     document.getElementById('btn-use-on-canvas')?.addEventListener('click', async () => {
-    // 1. Wir holen uns den aktuellen SMILES vom Canvas
-    const smiles = generateSmiles(state.getAtoms(), state.getBonds());
-    if (!smiles) return;
+    if (!currentSdfData) {
+        alert("Bitte lass zuerst eine Struktur im 3D Viewer generieren.");
+        return;
+    }
 
     try {
-        // UI Feedback: Cursor auf Warten setzen
         document.body.style.cursor = "wait";
         const btn = document.getElementById('btn-use-on-canvas') as HTMLButtonElement;
         if (btn) btn.disabled = true;
 
-        const sdfData = await generate2DModelPython(smiles);
-
-        applySdfToCanvas(sdfData, render);
+        applySdfToCanvas(currentSdfData, render);
 
         if (viewer3dDialog) viewer3dDialog.style.display = 'none';
 
-        console.log("3D structure was used.");
+        if (!state.is3DMode) {
+            state.set3DMode(true);
+            const toggleBtn = document.getElementById('btn-toggle-3d');
+            if (toggleBtn) toggleBtn.innerText = "2D Modus";
+        }
+
+        render();
+
+        console.log("Worked.");
 
     } catch (err) {
-        console.error("Error while transfering to canvas:", err);
-        alert("Transfer failed: " + (err as Error).message);
+        console.error("Fehler beim Übertragen auf Canvas:", err);
+        alert("Didn't work: " + (err as Error).message);
     } finally {
         document.body.style.cursor = "default";
         const btn = document.getElementById('btn-use-on-canvas') as HTMLButtonElement;
