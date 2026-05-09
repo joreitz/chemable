@@ -47,7 +47,7 @@
         /* Top Bar (Datei, Bearbeiten, etc.) */
         #menubar {
             top: 20px;
-            left: 20px;
+            right: 20px;
             padding: 5px 15px;
             align-items: center;
             gap: 10px;
@@ -240,6 +240,7 @@
             <button class="menu-btn"> Plugins</button>
             <div class="dropdown-content" id="plugin-dropdown-content">
                 </div>
+            <div id="plugin-info-area" style="display:none;"></div>
         </div>
 
         <div class="slider-group">
@@ -370,7 +371,7 @@
     </div>
     <ul id="knowitall-results" style="list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
         </ul>
-</div>
+    </div>
 
     <script>
       require('./dist/renderer.js');

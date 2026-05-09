@@ -1,15 +1,11 @@
-// src/chemistry/optimize-3d.ts
 import { state } from "../state";
 import { Atom, Bond } from "../types";
 
 export function applySdfToCanvas(sdfString: string, render: () => void) {
     const oldAtoms = state.getAtoms();
-    
-    if (oldAtoms.length === 0) return;
 
     try {
         const lines = sdfString.split('\n');
-        
         const countsLine = lines[3];
         if (!countsLine) throw new Error("Ungültiges SDF Format");
 
@@ -27,7 +23,6 @@ export function applySdfToCanvas(sdfString: string, render: () => void) {
             const y = parseFloat(line.substring(10, 20).trim());
             const z = parseFloat(line.substring(20, 30).trim());
             const element = line.substring(31, 34).trim();
-            
             tempAtoms.push({ id: i + 1, element, x, y, z });
         }
 
@@ -48,49 +43,41 @@ export function applySdfToCanvas(sdfString: string, render: () => void) {
 
         for (const a of tempAtoms) {
             if (a.element.toUpperCase() === 'H') continue; 
-
             newAtoms.push({
-                id: newIdCounter,
-                element: a.element,
-                x: a.x * scale,
-                y: -a.y * scale, 
-                z: -a.z * scale,       
-                orig3DX: a.x * scale,
-                orig3DY: -a.y * scale,
-                orig3DZ: -a.z * scale  
+                id: newIdCounter, element: a.element,
+                x: a.x * scale, y: -a.y * scale, z: -a.z * scale,
+                orig3DX: a.x * scale, orig3DY: -a.y * scale, orig3DZ: -a.z * scale
             });
             idMap.set(a.id, newIdCounter); 
             newIdCounter++;
         }
 
-        // Bindungen prüfen
         for (const b of tempBonds) {
             const newId1 = idMap.get(b.id1);
             const newId2 = idMap.get(b.id2);
-
-            if (newId1 && newId2) {
-                newBonds.push({ id1: newId1, id2: newId2, type: b.type });
-            }
+            if (newId1 && newId2) newBonds.push({ id1: newId1, id2: newId2, type: b.type });
         }
 
-        // Zentrieren
-        let oldCx = 0, oldCy = 0;
-        oldAtoms.forEach(a => { oldCx += a.x; oldCy += a.y; });
-        oldCx /= oldAtoms.length; oldCy /= oldAtoms.length;
+        let targetCx = 0, targetCy = 0;
+        if (oldAtoms.length > 0) {
+            oldAtoms.forEach(a => { targetCx += a.x; targetCy += a.y; });
+            targetCx /= oldAtoms.length; targetCy /= oldAtoms.length;
+        } else {
+            const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
+            targetCx = canvas ? canvas.width / 2 : 400;
+            targetCy = canvas ? canvas.height / 2 : 300;
+        }
 
         let newCx = 0, newCy = 0;
-        newAtoms.forEach(a => { newCx += a.x; newCy += a.y; });
-        newCx /= newAtoms.length; newCy /= newAtoms.length;
-
-        const dx = oldCx - newCx;
-        const dy = oldCy - newCy;
-
-        newAtoms.forEach(a => {
-            a.x += dx;
-            a.y += dy;
-            a.orig3DX! += dx;
-            a.orig3DY! += dy;
-        });
+        if (newAtoms.length > 0) {
+            newAtoms.forEach(a => { newCx += a.x; newCy += a.y; });
+            newCx /= newAtoms.length; newCy /= newAtoms.length;
+            const dx = targetCx - newCx; const dy = targetCy - newCy;
+            newAtoms.forEach(a => {
+                a.x += dx; a.y += dy;
+                a.orig3DX! += dx; a.orig3DY! += dy;
+            });
+        }
 
         state.saveState();
         state.setAtoms(newAtoms);
@@ -99,6 +86,6 @@ export function applySdfToCanvas(sdfString: string, render: () => void) {
 
     } catch (err) {
         console.error(err);
-        alert("Error with current structure: " + (err as Error).message);
+        alert("Error with the structure: " + (err as Error).message);
     }
 }

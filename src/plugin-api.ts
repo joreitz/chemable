@@ -4,8 +4,8 @@ import { Atom, Bond } from "./types";
 export interface ChemableContext {
     getAtoms: () => Atom[];
     getBonds: () => Bond[];
-    saveState: () => void;
-    render: () => void;    
+    saveState: () => void;     // Neu: Für Undo/Redo nach Import
+    render: () => void;        // Neu: Damit Plugins das Canvas aktualisieren können
     showMessage: (msg: string) => void;
     drawOverlay: (data: any) => void; 
 }
