@@ -5,13 +5,14 @@
   "main": "dist/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/joreit/chemable.git"
+    "url": "https://github.com/joreitz/chemable.git"
   },
-  "scripts": {
+"scripts": {
     "build": "tsc",
     "start": "tsc && electron dist/main.js",
     "pack": "tsc && electron-builder --dir",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux",
+    "release": "tsc && electron-builder --publish always"
   },
   "author": "Joshua Reitz",
   "license": "ISC",
@@ -27,10 +28,23 @@
   "build": {
     "appId": "com.joreitz.chemable",
     "productName": "Chemable",
-    "directories": { "output": "release" },
-    "mac": { "target": "dmg" },
-    "win": { "target": "nsis"},
-    "linux": { "target": "AppImage", "category": "Science"},
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg",
+      "identity": null
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Science"
+    },
+    "publish": [
+      "github"
+    ],
     "extraResources": [
       {
         "from": "bin/${os}",

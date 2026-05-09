@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' 
+      - 'v*'
 
 jobs:
   release:
@@ -14,18 +14,17 @@ jobs:
 
     steps:
       - name: Code auschecken
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Node.js installieren
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 24.11.1 
+          node-version: 20
 
-      - name: Abhängigkeiten installieren (npm install)
+      - name: Abhängigkeiten installieren
         run: npm install
 
-      - name: Kompilieren und auf GitHub hochladen!
+      - name: Kompilieren und Release erstellen
         env:
-
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build
+        run: npm run release
