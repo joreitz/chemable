@@ -1,0 +1,31 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' 
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v3
+
+      - name: Node.js installieren
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24.11.1 
+
+      - name: Abhängigkeiten installieren (npm install)
+        run: npm install
+
+      - name: Kompilieren und auf GitHub hochladen!
+        env:
+
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build
