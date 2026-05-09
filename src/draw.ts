@@ -313,9 +313,9 @@ export function drawScene(
         if (skipCompletely) continue;
 
         const textWidth = ctx.measureText(label || "C").width;
-        // Radien werden ebenfalls mit der Tiefe skaliert!
-        const bgRadiusX = Math.max(12 * scale, textWidth / 2 + (4 * scale));
-        const bgRadiusY = 13 * scale; 
+        
+        const bgRadiusX = Math.max(currentFontSize * 0.75, (textWidth / 2) + (currentFontSize * 0.25));
+        const bgRadiusY = currentFontSize * 0.85; 
         
         let shiftX = 0;
         if (!isHidden && ((atom.customLabel && atom.alignFirstLetter) || (!atom.customLabel && label.length > atom.element.length))) {
@@ -329,7 +329,7 @@ export function drawScene(
         if (!isTextElement || isError) {
             if (isError) {
                 ctx.beginPath();
-                ctx.ellipse(drawX, atom.y, bgRadiusX + (4*scale), bgRadiusY + (4*scale), 0, 0, Math.PI * 2);
+                ctx.ellipse(drawX, atom.y, bgRadiusX + (currentFontSize * 0.2), bgRadiusY + (currentFontSize * 0.2), 0, 0, Math.PI * 2);
                 ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
                 ctx.fill();
             }
@@ -341,6 +341,7 @@ export function drawScene(
             }
         }
 
+        // Atom-Label zeichnen
         if (!isHidden) {
             ctx.fillStyle = atom.color || options.globalColor;
             ctx.fillText(label, drawX, atom.y);
@@ -356,26 +357,29 @@ export function drawScene(
                 angle = isHidden ? -Math.PI / 2 : (bondOnRight ? -Math.PI * 0.8 : -Math.PI * 0.2);
             }
 
-            const badgeX = drawX + Math.cos(angle) * (bgRadiusX + (5*scale));
-            const badgeY = atom.y + Math.sin(angle) * (bgRadiusY + (5*scale));
-            const badgeRadius = Math.max(7 * scale, currentFontSize * 0.45);
+            const orbitPadding = currentFontSize * 0.25;
+            const badgeX = drawX + Math.cos(angle) * (bgRadiusX + orbitPadding);
+            const badgeY = atom.y + Math.sin(angle) * (bgRadiusY + orbitPadding);
+            
+            const badgeRadius = Math.max(7 * scale, currentFontSize * 0.42);
             
             ctx.beginPath();
             ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
             ctx.fillStyle = "#FFFFFF";
             ctx.fill();
-            ctx.lineWidth = 1;
+            ctx.lineWidth = Math.max(1, 1.5 * scale);
             ctx.strokeStyle = atom.color || options.globalColor;
             ctx.stroke();
 
             ctx.fillStyle = atom.color || options.globalColor;
             ctx.font = `bold ${Math.max(10 * scale, currentFontSize * 0.6)}px Arial`;
-            ctx.fillText(signStr, badgeX, badgeY + (1*scale));
+            ctx.fillText(signStr, badgeX, badgeY + (1 * scale)); // +1px bleibt für die vertikale optische Mitte bei Arial
 
             if (absCharge > 1) {
                 ctx.textAlign = "right";
                 ctx.font = `bold ${Math.max(12 * scale, currentFontSize * 0.7)}px Arial`;
-                ctx.fillText(absCharge.toString(), badgeX - badgeRadius - (2*scale), badgeY + (1*scale));
+                // Abstand zur Zahl ebenfalls proportional (10% der Schriftgröße)
+                ctx.fillText(absCharge.toString(), badgeX - badgeRadius - (currentFontSize * 0.1), badgeY + (1 * scale));
             }
             ctx.textAlign = "center"; // Zurücksetzen für das nächste Atom
         }
@@ -386,18 +390,21 @@ export function drawScene(
                 angle = isHidden ? -Math.PI / 2 : (bondOnRight ? -Math.PI * 0.8 : -Math.PI * 0.2);
             }
             
-            const distRadiusX = (bgRadiusX + (5*scale)) + (atom.charge ? (14*scale) : 0);
-            const distRadiusY = (bgRadiusY + (5*scale)) + (atom.charge ? (14*scale) : 0);
+            const orbitPadding = currentFontSize * 0.25;
+            const chargeOffset = atom.charge ? (currentFontSize * 0.85) : 0;
+            
+            const distRadiusX = bgRadiusX + orbitPadding + chargeOffset;
+            const distRadiusY = bgRadiusY + orbitPadding + chargeOffset;
             const radX = drawX + Math.cos(angle) * distRadiusX;
             const radY = atom.y + Math.sin(angle) * distRadiusY;
             
             ctx.beginPath();
-            ctx.arc(radX, radY, 2.5 * scale, 0, Math.PI * 2);
+            // Der Punkt wächst ebenfalls leicht mit der Tiefe/Schriftgröße
+            ctx.arc(radX, radY, Math.max(2, currentFontSize * 0.15), 0, Math.PI * 2);
             ctx.fillStyle = atom.color || options.globalColor;
             ctx.fill();
         }
     }
-
     // --- RESET ALPHA FÜR UI-ELEMENTE ---
     ctx.globalAlpha = 1.0; 
 

@@ -1,8 +1,12 @@
 {
   "name": "chemable",
-  "version": "1.0.1",
-  "description": "2D Chemical Drawing Editor",
+  "version": "1.0.2",
+  "description": "A 2D Chemical Drawing Editor",
   "main": "dist/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joreit/chemable.git"
+  },
   "scripts": {
     "build": "tsc",
     "start": "tsc && electron dist/main.js",
@@ -23,13 +27,10 @@
   "build": {
     "appId": "com.joreitz.chemable",
     "productName": "Chemable",
-    "directories": {
-      "output": "release"
-    },
-    "linux": {
-      "target": "tar.gz",
-      "category": "Science"
-    },
+    "directories": { "output": "release" },
+    "mac": { "target": "dmg" },
+    "win": { "target": "nsis"},
+    "linux": { "target": "AppImage", "category": "Science"},
     "extraResources": [
       {
         "from": "bin/${os}",
