@@ -104,6 +104,7 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         document.body.style.cursor = "default";
     }
     });
+    
     //  Toggle
     document.getElementById('btn-grid')?.addEventListener('click', () => {
         uiState.showGrid = !uiState.showGrid;
@@ -141,7 +142,6 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         }
         render();
     });
-
     document.getElementById('btn-clean')?.addEventListener('click', async () => {
         const smiles = generateSmiles(state.getAtoms(), state.getBonds());
         if (!smiles) {
