@@ -4,6 +4,10 @@ import { state } from "../state";
 import { generate2DModelPython } from "../chemistry/rdkit-3d";
 import { applySdfToCanvas } from "../chemistry/optimize-3d"
 import { generateSmiles } from "../smiles";
+import { generateHighResPNG } from "../export";
+
+const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type;
+const electron = isElectron ? (window as any).require('electron') : null;
 
 export function setMode(mode: any, activeBtnId?: string) {
         uiState.editMode = mode;
@@ -63,7 +67,43 @@ export function initToolbar(render: () => void, performUndo: () => void) {
     // --- AKTIONEN ---
     document.getElementById('btn-clear')?.addEventListener('click', () => { state.clear(); render(); });
     document.getElementById('btn-undo')?.addEventListener('click', performUndo);
+    document.getElementById('btn-export-png')?.addEventListener('click', () => {
+    const atoms = state.getAtoms();
+    const bonds = state.getBonds();
+    
+    if (atoms.length === 0) {
+        alert("Keine Struktur zum Exportieren vorhanden.");
+        return;
+    }
 
+    try {
+        document.body.style.cursor = "wait";
+        
+        // --- NEU: Schriftgröße direkt aus dem UI-Element auslesen ---
+        // WICHTIG: Passe die ID ('font-size-slider') an die tatsächliche ID deines HTML-Sliders an!
+        let currentFontSize = 16;
+        const fontSizeInput = document.getElementById('font-size-slider') as HTMLInputElement; 
+        if (fontSizeInput) {
+            currentFontSize = parseInt(fontSizeInput.value) || 16;
+        }
+        
+        // Schriftgröße als 3. Parameter übergeben
+        const dataUrl = generateHighResPNG(atoms, bonds, currentFontSize);
+        
+        if (dataUrl) {
+            const link = document.createElement('a');
+            link.download = 'molekuel.png';
+            link.href = dataUrl;
+            document.body.appendChild(link); 
+            link.click();
+            document.body.removeChild(link);
+        }
+    } catch (err) {
+        alert("Fehler beim Erstellen des PNGs: " + err);
+    } finally {
+        document.body.style.cursor = "default";
+    }
+    });
     //  Toggle
     document.getElementById('btn-grid')?.addEventListener('click', () => {
         uiState.showGrid = !uiState.showGrid;
