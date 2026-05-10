@@ -1,4 +1,4 @@
-export type EditMode = "draw" | "move" | "erase" | "select" | "text" | "arrow" | "charge_plus" | "charge_minus" | "radical" | "rotate_3d";
+export type EditMode = "draw" | "move" | "erase" | "select" | "text" | "arrow" | "charge_plus" | "charge_minus" | "radical" | "rotate_3d" | "align_3d" ;
 
 class UIState {
     public editMode: EditMode = "draw";

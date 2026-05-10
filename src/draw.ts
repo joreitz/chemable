@@ -225,7 +225,7 @@ export function drawScene(
 
     for (const item of drawables) {
         if (item.type === 'bond') {
-            // --- BINDUNGEN ZEICHNEN ---
+            //BINDUNGEN
             const { bond, a1, a2 } = item;
             const dx = a2.x - a1.x;
             const dy = a2.y - a1.y;
@@ -234,9 +234,8 @@ export function drawScene(
 
             const data1 = atomData.get(a1.id);
             const data2 = atomData.get(a2.id);
-
-            // Elliptisches Clipping: Die Lücke passt sich an, ob die Bindung von oben (Buchstabenhöhe) 
-            // oder von der Seite (Textbreite) in das Atom eintritt!
+            
+            //clipping
             const absCos = Math.abs(dx / len);
             const absSin = Math.abs(dy / len);
             
@@ -258,7 +257,8 @@ export function drawScene(
             const ey = a2.y - uy * r2;
 
             ctx.globalAlpha = 1.0; 
-            ctx.lineWidth = Math.max(0.5, 2 + (item.z * 0.06)); 
+
+            ctx.lineWidth = Math.min(6, Math.max(0.5, 2 + (item.z * 0.06)));
             ctx.strokeStyle = bond.color || options.globalColor;
             
             let offset = bond.spacing || options.globalBondSpacing;
@@ -317,7 +317,7 @@ export function drawScene(
                 ctx.stroke();
             } else if (bond.type === 5) { // Keil
                 const startWidth = 1.0; 
-                const endWidth = Math.max(3.0, 5.0 + (item.z * 0.05)); 
+                const endWidth = Math.min(8, Math.max(3.0, 5.0 + (item.z * 0.05))); 
                 ctx.fillStyle = bond.color || options.globalColor;
                 ctx.lineJoin = "round"; 
                 ctx.beginPath();

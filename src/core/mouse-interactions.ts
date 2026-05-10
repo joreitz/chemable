@@ -23,6 +23,7 @@ const textEditorDiv = document.getElementById('custom-text-editor')!;
 let isRotating3D = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+let alignSelection: Atom[] = [];
 // ...
 
 export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) {
@@ -40,6 +41,50 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         if (e.button === 2 && pendingTemplate) {
             cancelTemplate(render);
             return; 
+        }
+
+        if (uiState.editMode === "align_3d" && e.button === 0) {
+            const atoms = state.getAtoms();
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) - uiState.panX;
+            const y = (e.clientY - rect.top) - uiState.panY;
+            
+            const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
+            if (clickedAtom) {
+                if (!alignSelection.some(a => a.id === clickedAtom.id)) {
+                    alignSelection.push(clickedAtom);
+                }
+
+                if (alignSelection.length === 2) {
+                    const a1 = alignSelection[0];
+                    const a2 = alignSelection[1];
+                    const dx = a2.x - a1.x;
+                    const dy = a2.y - a1.y;
+                    
+                    const currentAngle = Math.atan2(dy, dx);
+                    const targetAngle = -Math.PI / 2;
+                    const deltaAngle = targetAngle - currentAngle;
+
+                    const cx = (a1.x + a2.x) / 2;
+                    const cy = (a1.y + a2.y) / 2;
+
+                    state.saveState();
+                    atoms.forEach(a => {
+                        const rot = rotatePoint({x: a.x, y: a.y}, {x: cx, y: cy}, deltaAngle);
+                        a.x = rot.x;
+                        a.y = rot.y;
+                        
+                        if (a.orig3DX !== undefined && a.orig3DY !== undefined) {
+                            const rot3D = rotatePoint({x: a.orig3DX, y: a.orig3DY}, {x: cx, y: cy}, deltaAngle);
+                            a.orig3DX = rot3D.x;
+                            a.orig3DY = rot3D.y;
+                        }
+                    });
+                    alignSelection = []; 
+                }
+                render();
+            }
+            return;
         }
     
         if (pendingTemplate && e.button === 0) {

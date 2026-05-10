@@ -58,6 +58,7 @@ export function initToolbar(render: () => void, performUndo: () => void) {
     // Canvas neu zeichnen
     render(); 
     });
+    document.getElementById('btn-align-3d')?.addEventListener('click', () => setMode("align_3d"));
 
     // --- AKTIONEN ---
     document.getElementById('btn-clear')?.addEventListener('click', () => { state.clear(); render(); });

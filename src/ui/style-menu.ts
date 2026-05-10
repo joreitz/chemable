@@ -13,7 +13,6 @@ export function initStyleMenu(render: () => void) {
         render();
     });
 
-    // --- BINDUNGSLÄNGE (SKALIERUNG) ---
     const bondLengthSlider = document.getElementById('bond-length-slider') as HTMLInputElement;
     const bondLengthVal = document.getElementById('bond-length-val');
     let preSlideStateSaved = false;

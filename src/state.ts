@@ -11,7 +11,6 @@ let is3DMode = false;
 
 // --- PUBLIC INTERFACE ---
 export const state = {
-    // 1. Getter (Daten lesen)
     getAtoms: () => atoms,
     getBonds: () => bonds,
     getCurrentElement: () => currentElement,
@@ -67,27 +66,26 @@ export const state = {
     undo: (): boolean => {
         if (historyState.length === 0) {
             console.log("Nothing to undo.");
-            return false; // Signalisiert: "Nichts passiert"
+            return false; 
         }
 
         const lastState = historyState.pop();
         if (!lastState) return false;
 
-        // Zustand wiederherstellen
         atoms = lastState.atoms;
         bonds = lastState.bonds;
         nextId = lastState.nextId;
         currentElement = lastState.currentElement;
 
         console.log("Undo successful. Atoms:", atoms.length);
-        return true; // Signalisiert: "Daten geändert, bitte neu zeichnen!"
+        return true; 
     },
 
     get is3DMode() { return is3DMode; },
     set3DMode: (val: boolean) => { is3DMode = val; },
     
     clear: () => {
-        state.saveState(); // Erst sichern!
+        state.saveState();
         atoms = [];
         bonds = [];
         nextId = 1;
