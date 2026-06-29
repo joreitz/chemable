@@ -1,35 +1,36 @@
-name: Build and Release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: write
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Code auschecken
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Node.js installieren
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Abhängigkeiten installieren
-        run: npm install
+      - name: Install deps
+        run: npm ci
 
-      - name: Kompilieren und Release erstellen
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Build & publish (electron-builder)
+        run: npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release

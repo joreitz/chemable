@@ -12,6 +12,7 @@ import { state } from "./state";
 import { drawScene } from "./draw";
 import { uiState } from "./core/ui-state";
 import { init3DViewer } from "./viewer3d";
+import { initCubeViewer } from "./cube_viewer";
 
 // --- MODULE IMPORTS ---
 import { initToolbar } from "./ui/toolbar";
@@ -138,5 +139,6 @@ initTemplateMenu(render);
 initTextEditor(render);
 initPSEMenu();
 initStyleMenu(render);
+initCubeViewer();
 
 resizeCanvas();
