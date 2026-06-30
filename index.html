@@ -426,8 +426,17 @@
         <input type="checkbox" id="cube-show-h" checked> Show H
         </label>
 
-        <label style="font-size:12px; font-weight:600;">Isovalue ±<span id="cube-iso-val">0.020</span></label>
+        <label style="font-size:12px; font-weight:600;">Isovalue ±</label>
+    	<div style="display:flex; gap:8px; align-items:center;">
+      		<input type="range" id="cube-iso" min="0.001" max="0.1" step="0.001" value="0.02" style="flex:1;">
+      		<input type="number" id="cube-iso-num" min="0.0001" step="0.001" value="0.02"
+             style="width:72px; padding:4px; border:1px solid #ccc; border-radius:6px;">
+   	 </div>
         <input type="range" id="cube-iso" min="0.001" max="0.1" step="0.001" value="0.02">
+ 	
+	<label style="font-size:12px; font-weight:600;">Presentation preset (JSON)</label>
+    	<input type="file" id="cube-preset-input" accept=".json,application/json">
+ 	<button id="btn-cube-preset-clear" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Remove preset</button>
 
         <label style="font-size:12px; font-weight:600;">Colors of volume data (+ / −)</label>
         <div style="display:flex; gap:10px; align-items:center;">
