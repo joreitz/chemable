@@ -264,6 +264,25 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
                 }
             }
             render();
+        }
+        else if (isRotating) {
+            const currentAngle = angleOfMouseMovement({x: uiState.currentMouseX, y: uiState.currentMouseY}, rotationcenter);
+            const startAngle = angleOfMouseMovement({x: uiState.dragStartX, y: uiState.dragStartY}, rotationcenter);
+            const angleDelta = currentAngle - startAngle;
+    
+            const atoms = state.getAtoms();
+            const selectedIDs = state.getSelectedAtomIds();
+            const selectedAtoms = atoms.filter(atom => selectedIDs.has(atom.id));
+    
+            selectedAtoms.forEach(atom => {
+                const initialPos = initialAtomPosition.get(atom.id);
+                if (initialPos) {
+                    const rotated = rotatePoint(initialPos, rotationcenter, angleDelta);
+                    atom.x = rotated.x;
+                    atom.y = rotated.y;
+                }
+            });
+            render();
         } 
         else if (uiState.editMode === "move" && movingAtom) {
             let targetX = uiState.currentMouseX;
@@ -329,25 +348,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
                 }
             }
         } 
-        else if (isRotating) {
-            const currentAngle = angleOfMouseMovement({x: uiState.currentMouseX, y: uiState.currentMouseY}, rotationcenter);
-            const startAngle = angleOfMouseMovement({x: uiState.dragStartX, y: uiState.dragStartY}, rotationcenter);
-            const angleDelta = currentAngle - startAngle;
-    
-            const atoms = state.getAtoms();
-            const selectedIDs = state.getSelectedAtomIds();
-            const selectedAtoms = atoms.filter(atom => selectedIDs.has(atom.id));
-    
-            selectedAtoms.forEach(atom => {
-                const initialPos = initialAtomPosition.get(atom.id);
-                if (initialPos) {
-                    const rotated = rotatePoint(initialPos, rotationcenter, angleDelta);
-                    atom.x = rotated.x;
-                    atom.y = rotated.y;
-                }
-            });
-            render();
-        }
+        
     });
 
     canvas.addEventListener('mouseup', (e) => {
@@ -358,6 +359,13 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             return;
         }
         
+        if (isRotating) {
+            isRotating = false;
+            initialAtomPosition.clear();
+            state.saveState();
+            return;
+        }
+
         const rect = canvas.getBoundingClientRect();
         let x = e.clientX - rect.left - uiState.panX;
         let y = e.clientY - rect.top - uiState.panY;
@@ -414,12 +422,6 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         }
     
         if (uiState.editMode === "erase") return;
-    
-        if (isRotating) {
-            isRotating = false;
-            initialAtomPosition.clear();
-            return;
-        }
     
         if (uiState.editMode === "draw" || uiState.editMode === "arrow") {
             const atoms = state.getAtoms();

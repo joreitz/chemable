@@ -35,6 +35,7 @@
 
 /* --- TOOLBAR-SEKTIONEN --- */
 #toolbar { gap: 4px; }
+
 .tool-section { width: 100%; }
 .tool-section > summary {
     list-style: none;

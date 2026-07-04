@@ -24,7 +24,7 @@ function getAdjustedValence(element: string, charge: number, baseValence: number
     // Gruppe 14 (C, Si): Ladung reduziert Valenz (C+ = 3 Bindungen, C- = 3 Bindungen + freies Elektronenpaar)
     if (["C", "Si"].includes(element)) return Math.max(0, baseValence - Math.abs(charge));
 
-    if (["N", "P", "O", "S", "F", "Cl", "Br", "I"].includes(element)) return Math.min(0, baseValence + charge);
+    if (["N", "P", "O", "S", "F", "Cl", "Br", "I"].includes(element)) return Math.max(0, baseValence + charge);
     
     return baseValence;
 }
@@ -33,14 +33,13 @@ export function getImplicitHydrogens(atom: Atom, bonds: Bond[]): number {
     const data = periodicTable[atom.element];
     if (!data) return 0;
     
-    let targetValence = Math.max(...data.valency);
+    let targetValence = Math.min(...data.valency);
     targetValence = getAdjustedValence(atom.element, atom.charge || 0, targetValence);
     if (atom.radical) targetValence -= 1;
 
     let currentBonds = 0;
     for (const bond of bonds) {
         if (bond.id1 === atom.id || bond.id2 === atom.id) {
-            // FIX: Keile (5) und Dashes (6) zählen chemisch als 1 Einfachbindung!
             if (bond.type === 5 || bond.type === 6) currentBonds += 1;
             else if (bond.type !== 4) currentBonds += bond.type;
         }

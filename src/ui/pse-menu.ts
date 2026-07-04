@@ -25,14 +25,32 @@ export function initPSEMenu() {
             btn.style.backgroundColor = data.colorValue || "#eee";
 
             btn.addEventListener('click', () => {
+                slots[activeSlot] = symbol;
                 state.setCurrentElement(symbol);
-                if (currentElDisplay) currentElDisplay.innerText = `[ ${symbol} ]`;
+                renderSlots();
                 if (pseMenu) pseMenu.style.display = 'none';
             });
 
             pseGrid.appendChild(btn);
         }
     }
+
+    const slots = ["C", "C", "C", "C"];
+    let activeSlot = 0;
+    const slotBtns = document.querySelectorAll<HTMLButtonElement>(".atom-slot");
+
+    function renderSlots() {
+        slotBtns.forEach((b, i) => {
+            b.innerText = slots[i];
+            b.classList.toggle("active", i === activeSlot);  // nutzt dein .tool-btn.active-Blau? -> dann class="tool-btn atom-slot" im HTML
+        });
+    }
+    slotBtns.forEach((b, i) => b.addEventListener("click", () => {
+        activeSlot = i;
+        state.setCurrentElement(slots[i]);
+        renderSlots();
+    }));
+    renderSlots();
 
     initPSE();
 

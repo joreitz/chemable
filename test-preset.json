@@ -1,0 +1,8 @@
+{
+  "name": "CH-wire",
+  "background": "white",
+  "elements": {
+    "C": { "repr": "wire", "stickRadius": 0.03 },
+    "H": { "repr": "wire", "stickRadius": 0.03 }
+  }
+}

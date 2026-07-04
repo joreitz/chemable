@@ -7,7 +7,7 @@ import { applySdfToCanvas } from "./chemistry/optimize-3d";
 import { state } from "./state";
 
 type Repr = "ballstick" | "wire";
-interface AtomStyle { color?: string; scale?: number; stickRadius?: number; }
+interface AtomStyle { color?: string; scale?: number; stickRadius?: number; repr?: Repr; }
 interface Preset { name?: string; background?: string; default?: AtomStyle; elements?: { [el: string]: AtomStyle }; }
 interface MOSource { header: string[]; rawData: string; nums: number[] | null; nmo: number; pts: number; }
 type ParseResult = { kind: "single"; cube: string } | { kind: "multi"; source: MOSource; labels: string[] };
@@ -148,12 +148,13 @@ export function initCubeViewer(render: () => void) {
         return repr === "ballstick" ? { stick: { radius: 0.12 }, sphere: { scale: 0.25 } } : { stick: { radius: 0.05 } };
     }
     function elemSpec(s: AtomStyle): any {
-        if (repr === "ballstick") {
+        const r = s.repr ?? repr;                       // Preset gewinnt, sonst Toolbar-Buttons
+        if (r === "ballstick") {
             const o: any = { stick: { radius: s.stickRadius ?? 0.12 }, sphere: { scale: s.scale ?? 0.25 } };
             if (s.color) { o.stick.color = s.color; o.sphere.color = s.color; }
             return o;
         }
-        const o: any = { stick: { radius: s.stickRadius ?? 0.05 } };
+        const o: any = { stick: { radius: s.stickRadius ?? 0.05 } };  // wire = nur dünner Stick, keine Kugel
         if (s.color) o.stick.color = s.color;
         return o;
     }

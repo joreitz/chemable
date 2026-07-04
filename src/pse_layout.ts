@@ -28,7 +28,7 @@ export const elementLayout: Record<string, { row: number, col: number }> = {
     "Ar": { row: 3, col: 18 },
 
     // Periode 4 
-    "K" : { row: 4, col: 1 } ,
+    "K" : { row: 4, col: 1  },
     "Ca": { row: 4, col: 2  },
     "Sc": { row: 4, col: 3  },
     "Ti": { row: 4, col: 4  },

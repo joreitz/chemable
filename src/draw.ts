@@ -179,7 +179,8 @@ export function drawScene(
         const isError = options.showValenceWarnings && hasValenceError(atom, bonds);
         const textWidth = ctx.measureText(label || "C").width;
         
-        const bgRadiusX = Math.max(currentFontSize * 0.75, (textWidth / 2) + (currentFontSize * 0.25));
+        const elemWidth = ctx.measureText(atom.customLabel ? label.charAt(0) : atom.element).width;
+        const bgRadiusX = Math.max(currentFontSize * 0.75, (elemWidth / 2) + (currentFontSize * 0.25));
         const bgRadiusY = currentFontSize * 0.85; 
 
         let shiftX = 0;
@@ -191,10 +192,9 @@ export function drawScene(
 
         const drawX = atom.x + shiftX;
 
-        // Wir merken uns alle visuellen Daten für das spätere Zeichnen und für das Bond-Clipping
         atomData.set(atom.id, {
             label, isHidden, isError, currentFontSize, scale, fontToUse,
-            textWidth, bgRadiusX, bgRadiusY, shiftX, drawX, z
+            textWidth, bgRadiusX, bgRadiusY, shiftX, drawX, z, elemWidth
         });
 
         const skipCompletely = isHidden && !isError && options.selectedAtomId !== atom.id && !atom.charge && !atom.radical;
@@ -239,8 +239,8 @@ export function drawScene(
             const absCos = Math.abs(dx / len);
             const absSin = Math.abs(dy / len);
             
-            const r1 = (data1 && !data1.isHidden) ? (absCos * (data1.textWidth / 2 + 4) + absSin * (data1.currentFontSize * 0.6)) : 0;
-            const r2 = (data2 && !data2.isHidden) ? (absCos * (data2.textWidth / 2 + 4) + absSin * (data2.currentFontSize * 0.6)) : 0;
+            const r1 = (data1 && !data1.isHidden) ? (absCos * (data1.elemWidth / 2 + 4) + absSin * (data1.currentFontSize * 0.6)) : 0;
+            const r2 = (data2 && !data2.isHidden) ? (absCos * (data2.elemWidth / 2 + 4) + absSin * (data2.currentFontSize * 0.6)) : 0;
 
             // Wenn die Atome extrem nah aneinander liegen, brechen wir ab
             if (len <= r1 + r2) continue; 

@@ -24,6 +24,7 @@ import { initTextEditor } from "./ui/text-editor";
 import { initPSEMenu } from "./ui/pse-menu";
 import { initStyleMenu } from "./ui/style-menu";
 import { pendingTemplatePreview, templateTargetAtom } from "./chemistry/template-manager";
+import { initMoleculeData } from "./moldata/ui";
 
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -129,6 +130,7 @@ makeDraggable("style-panel");
 
 registerPlugin(analyzerPlugin); 
 
+initMoleculeData();
 initRDKit();
 init3DViewer(render);
 initToolbar(render, performUndo);

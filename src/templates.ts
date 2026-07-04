@@ -46,7 +46,7 @@ export const MOLECULE_TEMPLATES: Record<string, TemplateData> = {
         ]
     },
     "Cyclopentan": {
-        // Perfektes Fünfeck berechnet mit Winkeln (90, 162, 234, 306, 18)
+        // Perfektes Fünfeck mit Winkeln (90, 162, 234, 306, 18)
         atoms: [
             { id: 1, element: 'C', x: 0, y: -L },
             { id: 2, element: 'C', x: L * 0.95, y: -L * 0.31 },

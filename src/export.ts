@@ -136,8 +136,8 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
 
             const absCos = Math.abs(dx / len);
             const absSin = Math.abs(dy / len);
-            const r1 = !data1.isHidden ? (absCos * (data1.textWidth / 2 + 4) + absSin * (data1.currentFontSize * 0.6)) : 0;
-            const r2 = !data2.isHidden ? (absCos * (data2.textWidth / 2 + 4) + absSin * (data2.currentFontSize * 0.6)) : 0;
+            const r1 = (data1 && !data1.isHidden) ? (absCos * (data1.elemWidth / 2 + 4) + absSin * (data1.currentFontSize * 0.6)) : 0;
+            const r2 = (data2 && !data2.isHidden) ? (absCos * (data2.elemWidth / 2 + 4) + absSin * (data2.currentFontSize * 0.6)) : 0;
             
             if (len <= r1 + r2) return; 
             

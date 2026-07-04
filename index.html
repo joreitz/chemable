@@ -57,15 +57,27 @@
         }
 
         /* Side Bar (Werkzeuge zum Zeichnen) */
-        #toolbar {
-            top: 90px;
-            left: 20px;
-            padding: 10px;
-            flex-direction: column;
-            gap: 8px;
-            width: 160px;
+        #toolbar { gap: 4px; }
+        .tool-section { width: 100%; }
+        .tool-section > summary {
+            list-style: none;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 11px; text-transform: uppercase; font-weight: bold;
+            color: #9ca3af; letter-spacing: 0.5px;
+            cursor: pointer; padding: 6px 8px 2px 8px; user-select: none;
         }
-
+        .tool-section > summary::-webkit-details-marker { display: none; }
+        .tool-section > summary::after { content: "▾"; font-size: 10px; transition: transform 0.15s ease; }
+        .tool-section:not([open]) > summary::after { transform: rotate(-90deg); }
+        .tool-section[open] > summary { color: #6b7280; }
+        .group-body { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px 0; }
+        .group-row  { display: flex; gap: 6px; }
+        .group-row .tool-btn { flex: 1; justify-content: center; }
+        .atom-slot.active {
+            background-color: #c7d2fe !important;   /* dunkleres Indigo als --primary-bg */
+            color: var(--primary) !important;
+            border-color: var(--primary) !important;
+        }
         /* --- BUTTONS --- */
         button {
             background: none;
@@ -81,6 +93,8 @@
             align-items: center;
             gap: 8px;
         }
+
+        #cube-dialog { position: fixed; inset: 5%; z-index: 2000; }
 
         button:hover {
             background-color: rgba(0, 0, 0, 0.05);
@@ -292,6 +306,7 @@
         <div class="group-body">
             <button id="btn-export-smiles" class="tool-btn" title="SMILES exportieren">Export SMILES</button>
             <button id="btn-knowitall"     class="tool-btn" title="Datenbank-Suche">KnowItAll</button>
+            <button id="btn-moldata" class="tool-btn" title="Molecule Data Hub">Molecule Data</button>
         </div>
     </details>
 
@@ -304,7 +319,12 @@
 
     <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 10px; margin-top: 6px; text-align: center;">
         <div style="font-size: 12px; color: #6b7280; margin-bottom: 5px;">Chosen atom</div>
-        <span id="current-element-display" style="font-size: 18px; font-weight: 800; color: var(--primary);">C</span>
+        <div id="atom-slots" style="display:flex; gap:4px; justify-content:center;">
+            <button class="atom-slot" data-slot="0" style="flex:1; justify-content:center; font-weight:800; border:1px solid #ddd; padding:6px 0;">C</button>
+            <button class="atom-slot" data-slot="1" style="flex:1; justify-content:center; font-weight:800; border:1px solid #ddd; padding:6px 0;">C</button>
+            <button class="atom-slot" data-slot="2" style="flex:1; justify-content:center; font-weight:800; border:1px solid #ddd; padding:6px 0;">C</button>
+            <button class="atom-slot" data-slot="3" style="flex:1; justify-content:center; font-weight:800; border:1px solid #ddd; padding:6px 0;">C</button>
+        </div>
         <button id="btn-pse" style="width: 100%; justify-content: center; background: white; border: 1px solid #ddd; margin-top: 8px; font-size: 12px; padding: 4px;">Open PSE</button>
     </div>
 
@@ -395,8 +415,7 @@
 
     </div>
 
-    <div id="cube-dialog" class="modal" style="display:none; position:fixed; inset:5%;
-     z-index:2000; padding:0; flex-direction:row; overflow:hidden;">
+    <div id="cube-dialog" class="modal" style="display:none; padding:0; flex-direction:row; overflow:hidden;">
     <div id="cube-grid" style="flex:1; min-width:0; display:flex; gap:8px; padding:8px; overflow:hidden;"></div>
     <div style="width:240px; flex-shrink:0; padding:16px; display:flex; flex-direction:column; gap:14px;
         border-left:1px solid rgba(0,0,0,0.1); overflow:auto;">
@@ -405,7 +424,11 @@
         <label style="font-size:12px; font-weight:600;">Load .cube-files</label>
         <input type="file" id="cube-file-input" accept=".cube,.cub" multiple>
 
-        <label style="font-size:12px; font-weight:600;">MO</label>
+        <label style="font-size:12px; font-weight:600;">Panels</label>
+        <div style="display:flex; gap:6px;">
+            <button id="btn-cube-add-pane" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;">+ Panel</button>
+            <button id="btn-cube-sync" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;" title="Ansicht von Panel 1 auf alle">Sync View</button>
+        </div>
 
         <label style="font-size:12px; font-weight:600;">Representation</label>
         <div style="display:flex; gap:6px;">
@@ -471,5 +494,20 @@
     <script>
       require('./dist/renderer.js');
     </script>
+
+    <div id="moldata-dialog" class="modal" style="display:none; position:fixed; inset:8%; z-index:2000; padding:0; flex-direction:row; overflow:hidden;">
+        <div style="width:280px; flex-shrink:0; display:flex; flex-direction:column; border-right:1px solid rgba(0,0,0,0.1);">
+            <h3 id="moldata-title" style="margin:0; padding:12px 16px;">Molecule Data</h3>
+            <div id="moldata-tree" style="flex:1; overflow:auto; padding:8px;"></div>
+            <div style="padding:8px; display:flex; gap:6px;">
+                <button id="btn-moldata-add-species" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;">+ Species</button>
+                <button id="btn-moldata-close" class="btn-secondary" style="flex:1; margin:0;">Close</button>
+            </div>
+        </div>
+        <div id="moldata-detail" style="flex:1; min-width:0; padding:16px; overflow:auto;">
+            <div style="color:#999; font-size:13px;">Drag and drop data onto molecule.</div>
+        </div>
+    </div>
+
 </body>
 </html>
