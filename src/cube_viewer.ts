@@ -104,6 +104,8 @@ function cubeToMolblock(text: string): string {
     return out.join("\n") + "\n";
 }
 
+export let openCubeExternal: ((name: string, text: string) => void) | null = null;
+
 export function initCubeViewer(render: () => void) {
     const dialog    = document.getElementById("cube-dialog");
     const grid      = document.getElementById("cube-grid");
@@ -254,6 +256,15 @@ export function initCubeViewer(render: () => void) {
         }
         addPane(entryNames[0]);
     }
+
+    (window as any).__openCube = async (name: string, text: string) => {
+        if (!dialog) return;
+        dialog.style.left = dialog.style.top = dialog.style.right = dialog.style.bottom = "";
+        dialog.style.width = dialog.style.height = "";
+        dialog.style.display = "flex";
+        await ingest([new File([text], name)]);
+        resizeAll();
+    };
 
     function setIso(v: number) {
         if (Number.isNaN(v)) return;
@@ -424,4 +435,5 @@ export function initCubeViewer(render: () => void) {
     document.getElementById("btn-cube-close")?.addEventListener("click", () => {
         if (dialog) dialog.style.display = "none";
     });
+    
 }
