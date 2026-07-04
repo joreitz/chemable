@@ -1,4 +1,5 @@
 export type EntryKind = "orca-out" | "cube" | "xyz" | "file";
+export interface SolvEntry { method: string; solvent: string; valueEh: number; }
 
 export interface DataEntry {
     id: string;
@@ -14,6 +15,7 @@ export interface Species {
     multiplicity: number;
     note?: string;
     entries: DataEntry[];
+    solvation?: SolvEntry[];
 }
 
 export interface MolDataset {

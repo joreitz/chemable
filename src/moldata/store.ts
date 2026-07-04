@@ -1,4 +1,6 @@
 import { MolDataset, Species, DataEntry, EntryKind } from "./types";
+import { SolvEntry } from "./types";
+
 const fs = (window as any).require("fs");
 const path = (window as any).require("path");
 const os = (window as any).require("os");
@@ -44,4 +46,7 @@ export function addFile(ds: MolDataset, sp: Species, srcPath: string): DataEntry
 }
 export function absPath(ds: MolDataset, e: DataEntry): string {
     return path.join(ROOT, ds.name, "files", e.file);
+}  
+export function addSolvation(ds: MolDataset, sp: Species, s: SolvEntry) {
+    (sp.solvation ??= []).push(s); saveDataset(ds);
 }
