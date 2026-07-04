@@ -408,7 +408,7 @@
     <div id="cube-canvas" style="flex:1; position:relative; background:#fff;"></div>
     <div style="width:240px; padding:16px; display:flex; flex-direction:column; gap:14px;
         border-left:1px solid rgba(0,0,0,0.1); overflow:auto;">
-        <h3 style="margin:0;">Cube / MO Viewer</h3>
+        <h3 id="cube-drag-handle" style="margin:0; cursor:move;">Cube / MO Viewer</h3>
 
         <label style="font-size:12px; font-weight:600;">Load .cube-files</label>
         <input type="file" id="cube-file-input" accept=".cube,.cub" multiple>
@@ -448,6 +448,8 @@
             <input type="checkbox" id="cube-lock-view" checked> Fix of orientation
         </label>
         <button id="btn-cube-fit" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Centering view</button>
+        
+        <button id="btn-cube-to-canvas" class="btn-secondary" style="justify-content:center;">Project on canvas</button>
 
         <label style="font-size:12px; font-weight:600;">Export image</label>
         <div style="display:flex; gap:8px; align-items:center;">

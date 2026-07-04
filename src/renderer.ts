@@ -139,6 +139,6 @@ initTemplateMenu(render);
 initTextEditor(render);
 initPSEMenu();
 initStyleMenu(render);
-initCubeViewer();
+initCubeViewer(render);
 
 resizeCanvas();
