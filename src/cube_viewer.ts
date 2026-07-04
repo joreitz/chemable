@@ -384,26 +384,38 @@ export function initCubeViewer(render: () => void) {
     // Verschiebbar per Titelleiste
     const handle = document.getElementById("cube-drag-handle");
     if (dialog && handle) {
+        
         let ox = 0, oy = 0, dragging = false;
         handle.style.cursor = "move";
+
         handle.addEventListener("pointerdown", (e) => {
             dragging = true;
             const r = dialog.getBoundingClientRect();
             ox = e.clientX - r.left; oy = e.clientY - r.top;
             dialog.style.left = r.left + "px"; dialog.style.top = r.top + "px";
+            dialog.style.width = r.width + "px"; dialog.style.height = r.height + "px";  // Größe einfrieren
             (dialog.style as any).right = "auto"; (dialog.style as any).bottom = "auto";
             (e.target as Element).setPointerCapture(e.pointerId);
         });
+
         handle.addEventListener("pointermove", (e) => {
             if (!dragging) return;
-            dialog.style.left = (e.clientX - ox) + "px";
-            dialog.style.top = (e.clientY - oy) + "px";
+            const w = dialog.offsetWidth;
+            const V = 120; // so viel bleibt garantiert greifbar
+            let x = e.clientX - ox, y = e.clientY - oy;
+            x = Math.max(V - w, Math.min(x, window.innerWidth  - w)); // rechte Kante/Handle bleibt sichtbar
+            y = Math.max(0,     Math.min(y, window.innerHeight - V)); // Titelleiste bleibt oben drin
+            dialog.style.left = x + "px";
+            dialog.style.top  = y + "px";
         });
         handle.addEventListener("pointerup", (e) => { dragging = false; try { (e.target as Element).releasePointerCapture(e.pointerId); } catch {} });
     }
 
     document.getElementById("btn-cube")?.addEventListener("click", () => {
-        if (!dialog) { console.warn("[cube] #cube-dialog fehlt im DOM."); return; }
+        if (!dialog) { console.warn("[cube] #cube-dialog is missing in the DOM."); return; }
+        dialog.style.left = dialog.style.top = "";
+        dialog.style.right = dialog.style.bottom = "";
+        dialog.style.width = dialog.style.height = "";   // 
         dialog.style.display = "flex";
         resizeAll();
     });

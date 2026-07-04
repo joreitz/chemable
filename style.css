@@ -34,7 +34,6 @@
 
 /* --- TOOLBAR-SEKTIONEN --- */
 #toolbar { gap: 4px; }
-
 .tool-section { width: 100%; }
 .tool-section > summary {
     list-style: none;
@@ -44,12 +43,9 @@
     cursor: pointer; padding: 6px 8px 2px 8px; user-select: none;
 }
 .tool-section > summary::-webkit-details-marker { display: none; }
-.tool-section > summary::after {
-    content: "▾"; font-size: 10px; transition: transform 0.15s ease;
-}
+.tool-section > summary::after { content: "▾"; font-size: 10px; transition: transform 0.15s ease; }
 .tool-section:not([open]) > summary::after { transform: rotate(-90deg); }
 .tool-section[open] > summary { color: #6b7280; }
-
 .group-body { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 2px 0; }
 .group-row  { display: flex; gap: 6px; }
 .group-row .tool-btn { flex: 1; justify-content: center; }

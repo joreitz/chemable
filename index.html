@@ -195,8 +195,6 @@
         }
     </style>
 </head>
-    </style>
-</head>
 <body>
 
     <div id="menubar" class="glass-panel">
@@ -250,12 +248,6 @@
             <label for="bond-length-slider">Length:</label>
             <input type="range" id="bond-length-slider" min="20" max="150" value="60">
             <span id="bond-length-val">60</span>
-        </div>
-        
-        <div class="slider-group" style="border-left:none; margin-left:0; padding-left:0;">
-            <label for="font-size-slider">Font:</label>
-            <input type="range" id="font-size-slider" min="10" max="36" value="16">
-            <span id="font-size-val">27</span>
         </div>
     </div>
 
@@ -405,7 +397,7 @@
 
     <div id="cube-dialog" class="modal" style="display:none; position:fixed; inset:5%;
      z-index:2000; padding:0; flex-direction:row; overflow:hidden;">
-    <div id="cube-canvas" style="flex:1; position:relative; background:#fff;"></div>
+    <div id="cube-grid" style="flex:1; display:flex; gap:8px; padding:8px; background:#fff; overflow:hidden;"></div>
     <div style="width:240px; padding:16px; display:flex; flex-direction:column; gap:14px;
         border-left:1px solid rgba(0,0,0,0.1); overflow:auto;">
         <h3 id="cube-drag-handle" style="margin:0; cursor:move;">Cube / MO Viewer</h3>
@@ -414,7 +406,6 @@
         <input type="file" id="cube-file-input" accept=".cube,.cub" multiple>
 
         <label style="font-size:12px; font-weight:600;">MO</label>
-        <select id="cube-mo-select" style="padding:6px; border-radius:6px;"></select>
 
         <label style="font-size:12px; font-weight:600;">Representation</label>
         <div style="display:flex; gap:6px;">
@@ -432,7 +423,6 @@
       		<input type="number" id="cube-iso-num" min="0.0001" step="0.001" value="0.02"
              style="width:72px; padding:4px; border:1px solid #ccc; border-radius:6px;">
    	 </div>
-        <input type="range" id="cube-iso" min="0.001" max="0.1" step="0.001" value="0.02">
  	
 	<label style="font-size:12px; font-weight:600;">Presentation preset (JSON)</label>
     	<input type="file" id="cube-preset-input" accept=".json,application/json">
