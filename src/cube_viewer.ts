@@ -222,6 +222,7 @@ export function initCubeViewer(render: () => void) {
         new ResizeObserver(() => p.viewer?.resize()).observe(body);
         panes.push(p);
         if (p.current) paneRedraw(p, false);
+        requestAnimationFrame(() => p.viewer?.resize());
         return p;
     }
     function resetSession() {
