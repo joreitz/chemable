@@ -16,6 +16,11 @@ export interface OrcaData {
     nmr?: { idx: number; el: string; isotropic: number; anisotropy: number }[];
     solvation?: { model?: string; solvent?: string; epsilon?: number };  // trial: Format???
     ssc?: { a: number; b: number; elA: string; elB: string; rAB: number; isoHz: number }[];
+    epr?: {
+    g?: { gx: number; gy: number; gz: number; iso: number; dgx?: number; dgy?: number; dgz?: number };
+    zfs?: { D: number; EoverD: number };                      // cm-1
+    hfc?: { idx: number; el: string; isotope?: number; Ax: number; Ay: number; Az: number; Aiso: number; AFC?: number }[];  // MHz
+};
 }
 
 // letztes Vorkommen Header-Anker
@@ -51,6 +56,27 @@ const pSSC: BlockFn = (t) => {
     for (const m of t.matchAll(re))
         ssc.push({ elA: m[1], a: +m[2], elB: m[3], b: +m[4], rAB: +m[5], isoHz: +m[6] });
     return ssc.length ? { ssc } : {};
+};
+const pEPR: BlockFn = (t) => {
+    const epr: NonNullable<OrcaData["epr"]> = {};
+    // g-Tensor: "g(tot)  gx gy gz iso= X" + Delta-g-Zeile
+    const g = lastMatch(t, /g\(tot\)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+iso=\s+([\d.]+)/);
+    if (g) {
+        epr.g = { gx: +g[1], gy: +g[2], gz: +g[3], iso: +g[4] };
+        const dg = lastMatch(t, /Delta-g\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/);
+        if (dg) { epr.g.dgx = +dg[1]; epr.g.dgy = +dg[2]; epr.g.dgz = +dg[3]; }
+    }
+    // ZFS: "D   =  X cm**-1" + "E/D = Y"
+    const D = lastMatch(t, /^D\s+=\s+(-?[\d.]+)\s+cm\*\*-1/m);
+    const E = lastMatch(t, /^E\/D\s*=\s+(-?[\d.]+)/m);
+    if (D && E) epr.zfs = { D: +D[1], EoverD: +E[1] };
+    // HFC pro Kern: "Nucleus  0C : A : Isotope= 13" ... "A(FC) x x x" ... "A(Tot) Ax Ay Az  A(iso)= X"
+    const hfc: NonNullable<typeof epr.hfc> = [];
+    const re = /Nucleus\s+(\d+)([A-Z][a-z]?)\s*:\s*A\s*:\s*Isotope=\s*(\d+)[\s\S]*?(?:A\(FC\)\s+(-?[\d.]+))[\s\S]*?A\(Tot\)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+A\(iso\)=\s+(-?[\d.]+)/g;
+    for (const m of t.matchAll(re))
+        hfc.push({ idx: +m[1], el: m[2], isotope: +m[3], AFC: +m[4], Ax: +m[5], Ay: +m[6], Az: +m[7], Aiso: +m[8] });
+    if (hfc.length) epr.hfc = hfc;
+    return (epr.g || epr.zfs || epr.hfc) ? { epr } : {};
 };
 const pEnergy: BlockFn = (t) => ({ finalEnergyEh: num(lastMatch(t, /FINAL SINGLE POINT ENERGY\s+(-?\d+\.\d+)/)?.[1]) });
 const pCoords: BlockFn = (_t, lines) => {
@@ -174,7 +200,7 @@ const pSolvation: BlockFn = (t) => {
 
 // --- Registry: neuer Block = Funktion oben + Eintrag hier ---
 const BLOCKS: BlockFn[] = [pMeta, pEnergy, pCoords, pDipole, pS2, pMulliken, pBrokenSym,
-                           pFreq, pIR, pThermo, pTDDFT, pAbsorption, pNMR, pSolvation, pSSC];
+                           pFreq, pIR, pThermo, pTDDFT, pAbsorption, pNMR, pSSC, pEPR, pSolvation];
 
 export function parseOrca(text: string): OrcaData {
     const lines = text.split(/\r?\n/);

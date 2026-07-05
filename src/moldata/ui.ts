@@ -4,6 +4,7 @@ import { parseOrca, OrcaData } from "./orca-parser";
 import { addSolvation } from "./store"; 
 import { plotSpectrum } from "./spectrum";
 import { simulate1H } from "./nmr-sim";
+import { simulateEPR } from "./epr-sim";
 
 const fs = (window as any).require("fs");
 const { webUtils } = (window as any).require("electron");
@@ -115,6 +116,9 @@ export function initMoleculeData() {
         if (d.solvation) L.push(`Solvation detected: ${d.solvation.model} / ${d.solvation.solvent ?? "?"}`);
         if (d.meta?.runtime) L.push(`Runtime: ${d.meta.runtime}`);
         if (d.ssc) L.push(`J-Couplings: ${d.ssc.length} Pairs`);
+        if (d.epr?.g)   L.push(`EPR g: [${d.epr.g.gx.toFixed(5)}, ${d.epr.g.gy.toFixed(5)}, ${d.epr.g.gz.toFixed(5)}] · g_iso=${d.epr.g.iso.toFixed(5)}`);
+        if (d.epr?.zfs) L.push(`ZFS: D=${d.epr.zfs.D.toFixed(4)} cm⁻¹ · E/D=${d.epr.zfs.EoverD.toFixed(3)}`);
+        if (d.epr?.hfc) L.push(`HFC: ${d.epr.hfc.map(h => `${h.idx}${h.el}(¹³?${h.isotope}) A_iso=${h.Aiso.toFixed(1)} MHz`).join(" · ")}`);
         return L.map(x => `<div style="font-size:12px;padding:1px 0;">${x}</div>`).join("");
     }
 
@@ -260,7 +264,43 @@ export function initMoleculeData() {
         controls.append(jFill);
         return root;
     }
-
+    function eprPlot(d: OrcaData): HTMLElement {
+        const { root, canvas, controls } = plotSection("EPR (Pulver, 1. Abl. — g+A_iso, ohne ZFS!)");
+        const g = d.epr!.g!;
+        const freqIn = numInput(9.5, 60), lwIn = numInput(0.3, 55);
+        const checks: { cb: HTMLInputElement; a: number }[] = [];
+        controls.append("GHz:", freqIn, "LW [mT]:", lwIn);
+        for (const h of d.epr!.hfc ?? []) {
+            const lab = document.createElement("label");
+            lab.style.cssText = "display:flex;gap:3px;align-items:center;";
+            const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+            checks.push({ cb, a: h.Aiso });
+            lab.append(cb, `${h.idx}${h.el} (${h.Aiso.toFixed(1)} MHz)`);
+            controls.append(lab);
+        }
+        const draw = () => {
+            const { x, y } = simulateEPR(
+                { gx: g.gx, gy: g.gy, gz: g.gz, aisoMHz: checks.filter(c => c.cb.checked).map(c => c.a) },
+                parseFloat(freqIn.value) || 9.5, parseFloat(lwIn.value) || 0.3);
+            const ctx = canvas.getContext("2d")!;
+            const W = canvas.width, H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+            const yM = Math.max(...y.map(Math.abs)) || 1;
+            ctx.strokeStyle = "#eee"; ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();  // Nulllinie
+            ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 1.3; ctx.beginPath();
+            for (let i = 0; i < x.length; i++) {
+                const X = (x[i] - x[0]) / (x[x.length - 1] - x[0]) * W;
+                const Y = H / 2 - y[i] / yM * (H / 2 - 12);
+                i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+            }
+            ctx.stroke();
+            ctx.fillStyle = "#666"; ctx.font = "10px sans-serif";
+            ctx.fillText(`${x[0].toFixed(1)} mT`, 4, H - 4); ctx.fillText(`${x[x.length - 1].toFixed(1)} mT`, W - 60, H - 4);
+        };
+        freqIn.oninput = draw; lwIn.oninput = draw; checks.forEach(c => c.cb.onchange = draw);
+        draw();
+        return root;
+    }
 
     function renderDetail(sp: Species, e: DataEntry) {
         detail.innerHTML = `<div style="font-weight:600;">${e.label}</div>
@@ -291,7 +331,7 @@ export function initMoleculeData() {
             if (d?.absorption?.length) detail.appendChild(uvPlot(d));
             if (d?.nmr?.length) detail.appendChild(nmrPlot(d));
             if (d?.nmr?.length) detail.appendChild(nmrSimPlot(d));
-            
+            if (d?.epr) detail.appendChild(eprPlot(d));
         }
     }
 
