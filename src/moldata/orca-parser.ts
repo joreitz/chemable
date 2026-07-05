@@ -15,6 +15,7 @@ export interface OrcaData {
     absorption?: { to: string; eV: number; cm1: number; nm: number; fosc: number }[];
     nmr?: { idx: number; el: string; isotropic: number; anisotropy: number }[];
     solvation?: { model?: string; solvent?: string; epsilon?: number };  // trial: Format???
+    ssc?: { a: number; b: number; elA: string; elB: string; rAB: number; isoHz: number }[];
 }
 
 // letztes Vorkommen Header-Anker
@@ -42,6 +43,14 @@ const pMeta: BlockFn = (t) => {
         version: lastMatch(t, /Program Version\s+(\S+)/)?.[1],
         runtime: lastMatch(t, /TOTAL RUN TIME:\s*(.+)/)?.[1]?.trim(),
     }};
+};
+const pSSC: BlockFn = (t) => {
+    if (!/NMR SPIN-SPIN COUPLING CONSTANTS/.test(t)) return {};
+    const ssc: OrcaData["ssc"] = [];
+    const re = /NUCLEUS A = ([A-Z][a-z]?)\s+(\d+) NUCLEUS B = ([A-Z][a-z]?)\s+(\d+)[\s\S]*?r\(AB\) =\s+([\d.]+)[\s\S]*?J\[\d+,\d+\]\(Total\).*?iso=\s+(-?[\d.]+)/g;
+    for (const m of t.matchAll(re))
+        ssc.push({ elA: m[1], a: +m[2], elB: m[3], b: +m[4], rAB: +m[5], isoHz: +m[6] });
+    return ssc.length ? { ssc } : {};
 };
 const pEnergy: BlockFn = (t) => ({ finalEnergyEh: num(lastMatch(t, /FINAL SINGLE POINT ENERGY\s+(-?\d+\.\d+)/)?.[1]) });
 const pCoords: BlockFn = (_t, lines) => {
@@ -165,7 +174,7 @@ const pSolvation: BlockFn = (t) => {
 
 // --- Registry: neuer Block = Funktion oben + Eintrag hier ---
 const BLOCKS: BlockFn[] = [pMeta, pEnergy, pCoords, pDipole, pS2, pMulliken, pBrokenSym,
-                           pFreq, pIR, pThermo, pTDDFT, pAbsorption, pNMR, pSolvation];
+                           pFreq, pIR, pThermo, pTDDFT, pAbsorption, pNMR, pSolvation, pSSC];
 
 export function parseOrca(text: string): OrcaData {
     const lines = text.split(/\r?\n/);

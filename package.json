@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/joreitz/chemable.git"
   },
-"scripts": {
+  "scripts": {
     "build": "tsc",
     "start": "tsc && electron dist/main.js",
     "pack": "tsc && electron-builder --dir",
@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "jspdf": "^4.2.0",
+    "ml-matrix": "6.5.3",
+    "nmr-simulation": "^1.0.21",
     "svg2pdf.js": "^2.7.0"
   },
   "build": {
@@ -54,5 +56,9 @@
         ]
       }
     ]
+  },
+  "allowScripts": {
+    "nmr-simulation@1.0.21": true,
+    "ml-matrix@5.3.0": true
   }
 }
