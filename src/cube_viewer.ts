@@ -8,7 +8,7 @@ import { state } from "./state";
 
 type Repr = "ballstick" | "wire";
 interface AtomStyle { color?: string; scale?: number; stickRadius?: number; repr?: Repr; }
-interface Selection extends AtomStyle { index: string; }
+interface Selection extends AtomStyle { index: string; layer?: boolean; }
 interface Preset { name?: string; background?: string; default?: AtomStyle; elements?: { [el: string]: AtomStyle }; selections?: Selection[]; }
 interface MOSource { header: string[]; rawData: string; nums: number[] | null; nmo: number; pts: number; }
 type ParseResult = { kind: "single"; cube: string } | { kind: "multi"; source: MOSource; labels: string[] };
@@ -21,7 +21,7 @@ const DEFAULTS: CubePrefs = { colorPlus: "#3b82f6", colorMinus: "#ef4444", iso: 
 
 // Z -> Symbol / kovalente Radien (Å) für die Bindungserkennung beim Canvas-Transfer
 const SYM = ["", "H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"];
-const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66,F:0.57,Si:1.11,P:1.07,S:1.05,Cl:1.02,Br:1.20,I:1.39,Se:1.20 };
+const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66,F:0.57,Na:1.66,Mg:1.41,Al:1.21,Si:1.11,P:1.07,S:1.05,Cl:1.02,K:2.03,Ca:1.76,Ti:1.60,V:1.53,Cr:1.39,Mn:1.39,Fe:1.32,Co:1.26,Ni:1.24,Cu:1.32,Zn:1.22,Br:1.20,I:1.39,Se:1.20,Mo:1.54,Ru:1.46,Rh:1.42,Pd:1.39,Ag:1.45,Pt:1.36,Au:1.36 };
 const BOHR = 0.529177;
 
 function loadPrefs(): CubePrefs {
@@ -119,6 +119,24 @@ function cubeToMolblock(text: string): string {
     return out.join("\n") + "\n";
 }
 
+function atomsToMolblock(atoms: { s: string; x: number; y: number; z: number }[]): string {
+    const bonds: [number, number][] = [];
+    for (let a = 0; a < atoms.length; a++) for (let b = a + 1; b < atoms.length; b++) {
+        const dx = atoms[a].x - atoms[b].x, dy = atoms[a].y - atoms[b].y, dz = atoms[a].z - atoms[b].z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const lim = ((RCOV[atoms[a].s] ?? 0.77) + (RCOV[atoms[b].s] ?? 0.77)) * 1.3;
+        if (d > 0.4 && d < lim) bonds.push([a + 1, b + 1]);
+    }
+    const p3 = (n: number) => String(n).padStart(3);
+    const f = (v: number) => v.toFixed(4).padStart(10);
+    const out = ["layer", "  Chemable layer", ""];
+    out.push(`${p3(atoms.length)}${p3(bonds.length)}  0  0  0  0  0  0  0  0999 V2000`);
+    for (const a of atoms) out.push(`${f(a.x)}${f(a.y)}${f(a.z)} ${a.s.padEnd(3)} 0  0  0  0  0  0  0  0  0  0  0  0`);
+    for (const [i, j] of bonds) out.push(`${p3(i)}${p3(j)}  1  0  0  0  0`);
+    out.push("M  END");
+    return out.join("\n") + "\n";
+}
+
 function cubeAtoms(text: string): { s: string; x: number; y: number; z: number }[] {
     const lines = text.split(/\r?\n/);
     const natoms = Math.abs(parseInt(lines[2].trim().split(/\s+/)[0], 10));
@@ -129,9 +147,6 @@ function cubeAtoms(text: string): { s: string; x: number; y: number; z: number }
         out.push({ s: SYM[parseInt(t[0], 10)] || "C", x: +t[2] * unit, y: +t[3] * unit, z: +t[4] * unit });
     }
     return out;
-}
-function atomsToXYZ(a: { s: string; x: number; y: number; z: number }[]): string {
-    return `${a.length}\n\n` + a.map(x => `${x.s} ${x.x.toFixed(6)} ${x.y.toFixed(6)} ${x.z.toFixed(6)}`).join("\n") + "\n";
 }
 
 export let openCubeExternal: ((name: string, text: string) => void) | null = null;
@@ -159,7 +174,7 @@ export function initCubeViewer(render: () => void) {
     let repr: Repr = "ballstick";
     let showH = true;
     let showLabels = false;
-    let preset: Preset | null = loadPreset();
+    let preset: Preset | null = null;
     const prefs = loadPrefs();
 
     if (colPlus)   colPlus.value = prefs.colorPlus;
@@ -222,34 +237,28 @@ export function initCubeViewer(render: () => void) {
         if (!showH) m.setStyle({ elem: "H" }, {});
     }
     function buildModels(v: any, cubeText: string) {
-        const layers = (preset?.selections ?? []).filter(s => (s as any).layer && s.index);
-        if (!layers.length) {                                  
+        const layers = (preset?.selections ?? []).filter(s => s.layer && s.index);
+        if (!layers.length) {
             v.addModel(cubeText, "cube");
-            applyStyleOn(v);                                    // inkl. nicht-layer selections
+            applyStyleOn(v);
             return;
         }
         const atoms = cubeAtoms(cubeText);
-        console.log("[cube] total atoms:", atoms.length, "layers:", layers.map(l => l.index));
         const claimed = new Set<number>();
-        for (const sel of layers) {                             // Overlay-Modelle: je eigenes XYZ
+        for (const sel of layers) {
             const { set, invert } = parseIndexSpec(String(sel.index));
             const pick: typeof atoms = [];
             atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) { pick.push(a); claimed.add(i); } });
             console.log("[cube] layer", sel.index, "-> picked", pick.length);
             if (!pick.length) continue;
-            const mo = v.addModel(atomsToXYZ(pick), "xyz");
-            mo.assignBonds();                                   // Bindungen aus Abständen (sonst kein Wire sichtbar)
-            styleModel(mo, sel, true);
+            styleModel(v.addModel(atomsToMolblock(pick), "sdf"), sel, true);   // "sdf" = Molblock-Parser
         }
-        const base = atoms.filter((_, i) => !claimed.has(i));   // Basis: der Rest, default-Stil
-        const mb = v.addModel(atomsToXYZ(base), "xyz");
-        mb.assignBonds();
-        styleModel(mb, preset?.default ?? {});
+        styleModel(v.addModel(atomsToMolblock(atoms), "sdf"), preset?.default ?? {});
     }
     function applyLabelsOn(v: any) {
         v.removeAllLabels();                          // Labels überleben 
         if (!showLabels) return;
-        const atoms = v.selectedAtoms({});            // {} = alle Atome
+        const atoms = v.getModel((v.getNumModels?.() ?? 1) - 1)?.selectedAtoms({}) ?? v.selectedAtoms({});          // {} = alle Atome
         console.log("[cube] labels:", atoms.length);  // trial:
         atoms.forEach((a: any, i: number) => {
             if (!showH && a.elem === "H") return;
@@ -393,7 +402,6 @@ export function initCubeViewer(render: () => void) {
         off.remove();
     }
 
-    // Bei mehreren Panels: kleines Auswahl-Popup, welche exportiert werden
     function openPhotoChooser(scale: number) {
         const ov = document.createElement("div");
         ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:20;";
@@ -445,9 +453,11 @@ export function initCubeViewer(render: () => void) {
             preset = JSON.parse(await f.text()); savePreset(preset);
             allPanes(p => { p.viewer.setBackgroundColor(bg()); paneRedraw(p, true); });
         } catch (e) { console.warn("[cube] Preset-JSON ungültig:", e); }
+        presetInput.value = "";   // gleiche Datei erneut wählbar
     });
     document.getElementById("btn-cube-preset-clear")?.addEventListener("click", () => {
         preset = null; savePreset(null);
+        presetInput.value = "";   // sonst zeigt der Input noch den alten Dateinamen + blockt re-select
         allPanes(p => { p.viewer.setBackgroundColor(bg()); paneRedraw(p, true); });
     });
 
