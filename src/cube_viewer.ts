@@ -178,17 +178,21 @@ export function initCubeViewer(render: () => void) {
     }
     function applyLayeredSelections(v: any, cubeText: string) {
         if (!preset?.selections) return;
-        const all = v.selectedAtoms({});                          // Basis-Atome, Reihenfolge = Datei
         for (const sel of preset.selections) {
-            if (!sel.index || !(sel as any).layer) continue;       // nur Layer-Einträge hier
+            if (!sel.index || !(sel as any).layer) continue;
             const { set, invert } = parseIndexSpec(String(sel.index));
-            const keep = new Set(all.filter((_: any, i: number) => set.has(i + 1) !== invert).map((a: any) => a.serial));
-            // zweites Modell aus denselben Cube-Atomen, aber nur die gewählten behalten
+            const inSel = (i: number) => set.has(i + 1) !== invert;   // i = 0-basierter Ladeindex
+
+            // Overlay-Modell: nur die gewählten Atome behalten
             const m = v.addModel(cubeText, "cube");
-            m.selectedAtoms({}).forEach((a: any, i: number) => { if (set.has(i + 1) === invert) m.removeAtoms([a]); });
-            m.setStyle({}, elemSpec(sel));                         // Overlay-Stil (z.B. ballstick)
-            // Basis: dieselben Atome dünn/versteckt lassen -> hier ausblenden, damit nichts doppelt liegt
-            v.setStyle({ serial: [...keep] }, { stick: { hidden: true }, sphere: { hidden: true } });
+            const drop = m.selectedAtoms({}).filter((_: any, i: number) => !inSel(i));
+            m.removeAtoms(drop);                                       // in einem Rutsch, nicht im forEach
+            m.setStyle({}, elemSpec(sel));
+
+            // Basis-Modell (Modell 0): dieselben Atome entfernen, damit nichts doppelt liegt
+            const base = v.getModel(0);
+            const baseDrop = base.selectedAtoms({}).filter((_: any, i: number) => inSel(i));
+            base.removeAtoms(baseDrop);
         }
     }
     function applySelectionsOn(v: any) {
@@ -284,7 +288,7 @@ export function initCubeViewer(render: () => void) {
         new ResizeObserver(() => p.viewer?.resize()).observe(body);
         panes.push(p);
         if (p.current) paneRedraw(p, false);
-        requestAnimationFrame(() => p.viewer?.resize());
+        requestAnimationFrame(() => { p.viewer?.zoomTo(); p.viewer?.render(); });  // erzwingt sichtbares erstes Frame
         return p;
     }
     function resetSession() {
