@@ -2,6 +2,7 @@
 import { execFile } from 'child_process';
 import * as util from 'util';
 import * as path from 'path';
+import * as fs from 'fs';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -47,19 +48,26 @@ async function resolvePython(): Promise<string> {
 
 //     SMILES mit (), #, [], = usw. werden jetzt als Literal übergeben statt vom
 //     Shell-Quoting zerlegt zu werden. ---
+function bundledEngine(): string | null {
+    const exe = process.platform === 'win32' ? 'engine3d.exe' : 'engine3d';
+    const p = path.join(process.resourcesPath, 'external-bin', 'engine3d', exe);
+    try { return fs.existsSync(p) ? p : null; } catch { return null; }
+}
+
 async function runEngine(smiles: string, mode: "2d" | "3d"): Promise<string> {
     const cleanSmiles = smiles.trim().replace(/^SMILES=/i, "");
-    const scriptPath = path.join(__dirname, '../../engine_3d.py');
-    const python = await resolvePython();
+    const bundled = bundledEngine();
 
-    console.log(`[RDKit Python] ${python} ${scriptPath} "${cleanSmiles}" ${mode}`);
+    const cmd  = bundled ?? await resolvePython();
+    const args = bundled
+        ? [cleanSmiles, mode]
+        : [path.join(__dirname, '../../engine_3d.py'), cleanSmiles, mode];
 
-    const { stdout, stderr } = await execFileAsync(
-        python,
-        [scriptPath, cleanSmiles, mode],
-        { maxBuffer: 1024 * 1024 * 16 }
-    );
-
+    console.log(`[Engine] ${cmd}`);
+    const { stdout, stderr } = await execFileAsync(cmd, args, {
+        maxBuffer: 1024 * 1024 * 16,
+        windowsHide: true   // verhindert Konsolen-Flackern beim Console-Build auf Windows
+    });
     if (stderr && stderr.includes("ERROR")) throw new Error(stderr);
     return stdout;
 }

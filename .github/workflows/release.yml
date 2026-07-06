@@ -1,6 +1,6 @@
+# .github/workflows/release.yml — komplette Datei ersetzen
 name: Release
 
-# Auslösen durch einen Versions-Tag, z. B.:  git tag v1.1.1 && git push origin v1.1.1
 on:
   push:
     tags:
@@ -10,12 +10,17 @@ permissions:
   contents: write
 
 jobs:
-  # 1) Jede Plattform baut NUR (kein Publish) und legt ihre Installer als Artefakt ab
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            osdir: mac
+          - os: windows-latest
+            osdir: win
+          - os: ubuntu-latest
+            osdir: linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -23,12 +28,20 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Install deps
         run: npm ci
 
       - name: Compile TypeScript
         run: npm run build
+
+      - name: Freeze Python engine
+        run: |
+          pip install rdkit pyinstaller
+          pyinstaller --onedir --name engine3d --collect-all rdkit --distpath bin/${{ matrix.osdir }} --workpath pybuild --specpath pybuild engine_3d.py
 
       - name: Build app (ohne Publish)
         run: npx electron-builder --publish never
@@ -43,7 +56,6 @@ jobs:
             release/*.AppImage
           if-no-files-found: ignore
 
-  # 2) EIN Abschluss-Job sammelt alles ein und macht genau EINE Release
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -58,7 +70,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # evtl. vorhandene (kaputte) Release zum selben Tag wegräumen, Tag aber behalten
           gh release delete "${{ github.ref_name }}" --repo "${{ github.repository }}" --yes || true
           gh release create "${{ github.ref_name }}" artifacts/* \
             --repo "${{ github.repository }}" \
