@@ -21,7 +21,7 @@ const DEFAULTS: CubePrefs = { colorPlus: "#3b82f6", colorMinus: "#ef4444", iso: 
 
 // Z -> Symbol / kovalente Radien (Å) für die Bindungserkennung beim Canvas-Transfer
 const SYM = ["", "H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"];
-const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66f,F:0.57,Si:1.11,P:1.07,S:1.05,Cl:1.02,Br:1.20,I:1.39,Se:1.20 };
+const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66,F:0.57,Si:1.11,P:1.07,S:1.05,Cl:1.02,Br:1.20,I:1.39,Se:1.20 };
 const BOHR = 0.529177;
 
 function loadPrefs(): CubePrefs {
