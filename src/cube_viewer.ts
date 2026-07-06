@@ -116,6 +116,7 @@ export function initCubeViewer(render: () => void) {
     const colPlus   = document.getElementById("cube-col-plus") as HTMLInputElement;
     const colMinus  = document.getElementById("cube-col-minus") as HTMLInputElement;
     const chkH      = document.getElementById("cube-show-h") as HTMLInputElement;
+    const chkLabel = document.getElementById("cube-show-label") as HTMLInputElement;
     const reprBtns  = document.querySelectorAll<HTMLButtonElement>("[data-cube-repr]");
 
     let cubes: { [name: string]: string } = {};
@@ -127,6 +128,7 @@ export function initCubeViewer(render: () => void) {
     const panes: Pane[] = [];
     let repr: Repr = "ballstick";
     let showH = true;
+    let showLabels = false;
     let preset: Preset | null = loadPreset();
     const prefs = loadPrefs();
 
@@ -167,6 +169,20 @@ export function initCubeViewer(render: () => void) {
         if (preset?.elements) for (const [el, s] of Object.entries(preset.elements)) v.setStyle({ elem: el }, elemSpec(s));
         if (!showH) v.setStyle({ elem: "H" }, {});
     }
+    function applyLabelsOn(v: any) {
+        v.removeAllLabels();                          // Labels überleben 
+        if (!showLabels) return;
+        const atoms = v.selectedAtoms({});            // {} = alle Atome
+        console.log("[cube] labels:", atoms.length);  // trial:
+        atoms.forEach((a: any, i: number) => {
+            if (!showH && a.elem === "H") return;
+            v.addLabel(`${a.elem}${(a.index ?? i) + 1}`, {
+                position: { x: a.x, y: a.y, z: a.z },
+                fontSize: 11, fontColor: "black",
+                backgroundColor: "white", backgroundOpacity: 0.55, inFront: true,
+            });
+        });
+    }
     function drawIsoOn(v: any, name: string, smoothness: number): any[] {
         const vol = getVol(name);
         const val = parseFloat(isoSlider.value);
@@ -183,6 +199,7 @@ export function initCubeViewer(render: () => void) {
         materialize(p.current);
         p.viewer.addModel(cubes[p.current], "cube");
         applyStyleOn(p.viewer);
+        applyLabelsOn(p.viewer);
         p.isoShapes = drawIsoOn(p.viewer, p.current, 5);
         if (keep) p.viewer.setView(keep); else p.viewer.zoomTo();
         p.viewer.render();
@@ -365,7 +382,8 @@ export function initCubeViewer(render: () => void) {
         repr = (b.dataset.cubeRepr as Repr) || "ballstick";
         allPanes(p => { applyStyleOn(p.viewer); p.viewer.render(); });
     }));
-    chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => { applyStyleOn(p.viewer); p.viewer.render(); }); });
+    chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => { applyStyleOn(p.viewer); applyLabelsOn(p.viewer); p.viewer.render(); }); });
+    chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => { applyLabelsOn(p.viewer); p.viewer.render(); }); });
 
     let isoTimer: any = null;
     isoSlider?.addEventListener("input", () => {
