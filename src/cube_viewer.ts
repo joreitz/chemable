@@ -172,22 +172,37 @@ export function initCubeViewer(render: () => void) {
             if (s.color) { o.stick.color = s.color; o.sphere.color = s.color; }
             return o;
         }
-        const o: any = { stick: { radius: s.stickRadius ?? 0.05 } };  // wire = nur dünner Stick, keine Kugel
+        const o: any = { stick: { radius: s.stickRadius ?? 0.05 } };  // wire = nur dünner Stick
         if (s.color) o.stick.color = s.color;
         return o;
     }
-    function applySelectionsOn(v: any) {
-    if (!preset?.selections) return;
-    const atoms = v.selectedAtoms({});                       // Reihenfolge = Datei-/ORCA-Reihenfolge
-    console.log("[cube] selections, atoms:", atoms.length);  // trial: läuft's? Atomzahl plausibel?
-    for (const sel of preset.selections) {
-        if (sel.index == null) continue;
-        const { set, invert } = parseIndexSpec(String(sel.index));
-        const picked = atoms.filter((_: any, i: number) => set.has(i + 1) !== invert)
-                            .map((a: any) => a.index);
-        if (picked.length) v.setStyle({ index: picked }, elemSpec(sel));
+    function applyLayeredSelections(v: any, cubeText: string) {
+        if (!preset?.selections) return;
+        const all = v.selectedAtoms({});                          // Basis-Atome, Reihenfolge = Datei
+        for (const sel of preset.selections) {
+            if (!sel.index || !(sel as any).layer) continue;       // nur Layer-Einträge hier
+            const { set, invert } = parseIndexSpec(String(sel.index));
+            const keep = new Set(all.filter((_: any, i: number) => set.has(i + 1) !== invert).map((a: any) => a.serial));
+            // zweites Modell aus denselben Cube-Atomen, aber nur die gewählten behalten
+            const m = v.addModel(cubeText, "cube");
+            m.selectedAtoms({}).forEach((a: any, i: number) => { if (set.has(i + 1) === invert) m.removeAtoms([a]); });
+            m.setStyle({}, elemSpec(sel));                         // Overlay-Stil (z.B. ballstick)
+            // Basis: dieselben Atome dünn/versteckt lassen -> hier ausblenden, damit nichts doppelt liegt
+            v.setStyle({ serial: [...keep] }, { stick: { hidden: true }, sphere: { hidden: true } });
+        }
     }
-}
+    function applySelectionsOn(v: any) {
+        if (!preset?.selections) return;
+        const atoms = v.selectedAtoms({});                       // Reihenfolge = Datei-/ORCA-Reihenfolge
+        console.log("[cube] selections, atoms:", atoms.length);  // trial: läuft's? Atomzahl plausibel?
+        for (const sel of preset.selections) {
+            if (sel.index == null) continue;
+            const { set, invert } = parseIndexSpec(String(sel.index));
+            const picked = atoms.filter((_: any, i: number) => set.has(i + 1) !== invert)
+                                .map((a: any) => a.index);
+            if (picked.length) v.setStyle({ index: picked }, elemSpec(sel));
+        }
+    }
     function applyStyleOn(v: any) {
         if (!v) return;
         v.setStyle({}, baseAtomSpec());
@@ -224,12 +239,12 @@ export function initCubeViewer(render: () => void) {
         p.viewer.removeAllModels(); p.viewer.removeAllShapes(); p.isoShapes = [];
         p.viewer.setBackgroundColor(bg());
         materialize(p.current);
-        p.viewer.addModel(cubes[p.current], "cube");
-        applyStyleOn(p.viewer);
+        const cubeText = cubes[p.current];
+        p.viewer.addModel(cubeText, "cube");
+        applyStyleOn(p.viewer);                               // Basis: wire etc. (nicht-Layer-Selections wirken hier weiter)
+        applyLayeredSelections(p.viewer, cubeText);          // Overlay-Modelle drüber
         applyLabelsOn(p.viewer);
         p.isoShapes = drawIsoOn(p.viewer, p.current, 5);
-        if (keep) p.viewer.setView(keep); else p.viewer.zoomTo();
-        p.viewer.render();
     }
     function paneIso(p: Pane, smoothness: number) {
         if (!p.viewer || !p.current) return;
