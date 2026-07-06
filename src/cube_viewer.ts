@@ -97,6 +97,7 @@ function cubeToMolblock(text: string): string {
     const natoms = Math.abs(parseInt(lines[2].trim().split(/\s+/)[0], 10));
     const unit = parseInt(lines[3].trim().split(/\s+/)[0], 10) > 0 ? BOHR : 1; // +Voxelzahl => Bohr
     const atoms: { s: string; x: number; y: number; z: number }[] = [];
+    
     for (let i = 6; i < 6 + natoms; i++) {
         const t = lines[i].trim().split(/\s+/);
         atoms.push({ s: SYM[parseInt(t[0], 10)] || "C", x: +t[2] * unit, y: +t[3] * unit, z: +t[4] * unit });
@@ -116,6 +117,21 @@ function cubeToMolblock(text: string): string {
     for (const [i, j] of bonds) out.push(`${p3(i)}${p3(j)}  1  0  0  0  0`);
     out.push("M  END");
     return out.join("\n") + "\n";
+}
+
+function cubeAtoms(text: string): { s: string; x: number; y: number; z: number }[] {
+    const lines = text.split(/\r?\n/);
+    const natoms = Math.abs(parseInt(lines[2].trim().split(/\s+/)[0], 10));
+    const unit = parseInt(lines[3].trim().split(/\s+/)[0], 10) > 0 ? BOHR : 1;
+    const out: { s: string; x: number; y: number; z: number }[] = [];
+    for (let i = 6; i < 6 + natoms; i++) {
+        const t = lines[i].trim().split(/\s+/);
+        out.push({ s: SYM[parseInt(t[0], 10)] || "C", x: +t[2] * unit, y: +t[3] * unit, z: +t[4] * unit });
+    }
+    return out;
+}
+function atomsToXYZ(a: { s: string; x: number; y: number; z: number }[]): string {
+    return `${a.length}\n\n` + a.map(x => `${x.s} ${x.x.toFixed(6)} ${x.y.toFixed(6)} ${x.z.toFixed(6)}`).join("\n") + "\n";
 }
 
 export let openCubeExternal: ((name: string, text: string) => void) | null = null;
@@ -176,25 +192,6 @@ export function initCubeViewer(render: () => void) {
         if (s.color) o.stick.color = s.color;
         return o;
     }
-    function applyLayeredSelections(v: any, cubeText: string) {
-        if (!preset?.selections) return;
-        for (const sel of preset.selections) {
-            if (!sel.index || !(sel as any).layer) continue;
-            const { set, invert } = parseIndexSpec(String(sel.index));
-            const inSel = (i: number) => set.has(i + 1) !== invert;   // i = 0-basierter Ladeindex
-
-            // Overlay-Modell: nur die gewählten Atome behalten
-            const m = v.addModel(cubeText, "cube");
-            const drop = m.selectedAtoms({}).filter((_: any, i: number) => !inSel(i));
-            m.removeAtoms(drop);                                       // in einem Rutsch, nicht im forEach
-            m.setStyle({}, elemSpec(sel));
-
-            // Basis-Modell (Modell 0): dieselben Atome entfernen, damit nichts doppelt liegt
-            const base = v.getModel(0);
-            const baseDrop = base.selectedAtoms({}).filter((_: any, i: number) => inSel(i));
-            base.removeAtoms(baseDrop);
-        }
-    }
     function applySelectionsOn(v: any) {
         if (!preset?.selections) return;
         const atoms = v.selectedAtoms({});                       // Reihenfolge = Datei-/ORCA-Reihenfolge
@@ -214,6 +211,40 @@ export function initCubeViewer(render: () => void) {
         if (preset?.elements) for (const [el, s] of Object.entries(preset.elements)) v.setStyle({ elem: el }, elemSpec(s));
         applySelectionsOn(v);
         if (!showH) v.setStyle({ elem: "H" }, {});
+    }
+    function styleModel(m: any, sel: AtomStyle, layerWins = false) {
+        m.setStyle({}, elemSpec(sel));
+        if (preset?.elements)
+            for (const [el, s] of Object.entries(preset.elements)) {
+                const merged = layerWins ? { ...s, ...sel } : { ...sel, ...s };  // Overlay: Layer-Geometrie gewinnt, Element-Farbe bleibt
+                m.setStyle({ elem: el }, elemSpec(merged));
+            }
+        if (!showH) m.setStyle({ elem: "H" }, {});
+    }
+    function buildModels(v: any, cubeText: string) {
+        const layers = (preset?.selections ?? []).filter(s => (s as any).layer && s.index);
+        if (!layers.length) {                                  
+            v.addModel(cubeText, "cube");
+            applyStyleOn(v);                                    // inkl. nicht-layer selections
+            return;
+        }
+        const atoms = cubeAtoms(cubeText);
+        console.log("[cube] total atoms:", atoms.length, "layers:", layers.map(l => l.index));
+        const claimed = new Set<number>();
+        for (const sel of layers) {                             // Overlay-Modelle: je eigenes XYZ
+            const { set, invert } = parseIndexSpec(String(sel.index));
+            const pick: typeof atoms = [];
+            atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) { pick.push(a); claimed.add(i); } });
+            console.log("[cube] layer", sel.index, "-> picked", pick.length);
+            if (!pick.length) continue;
+            const mo = v.addModel(atomsToXYZ(pick), "xyz");
+            mo.assignBonds();                                   // Bindungen aus Abständen (sonst kein Wire sichtbar)
+            styleModel(mo, sel, true);
+        }
+        const base = atoms.filter((_, i) => !claimed.has(i));   // Basis: der Rest, default-Stil
+        const mb = v.addModel(atomsToXYZ(base), "xyz");
+        mb.assignBonds();
+        styleModel(mb, preset?.default ?? {});
     }
     function applyLabelsOn(v: any) {
         v.removeAllLabels();                          // Labels überleben 
@@ -243,12 +274,11 @@ export function initCubeViewer(render: () => void) {
         p.viewer.removeAllModels(); p.viewer.removeAllShapes(); p.isoShapes = [];
         p.viewer.setBackgroundColor(bg());
         materialize(p.current);
-        const cubeText = cubes[p.current];
-        p.viewer.addModel(cubeText, "cube");
-        applyStyleOn(p.viewer);                               // Basis: wire etc. (nicht-Layer-Selections wirken hier weiter)
-        applyLayeredSelections(p.viewer, cubeText);          // Overlay-Modelle drüber
-        applyLabelsOn(p.viewer);
+        buildModels(p.viewer, cubes[p.current]);     // Modelle + Styles (inkl. Layer)
+        applyLabelsOn(p.viewer);                     // einmal!
         p.isoShapes = drawIsoOn(p.viewer, p.current, 5);
+        if (keep) p.viewer.setView(keep); else p.viewer.zoomTo();
+        p.viewer.render();  
     }
     function paneIso(p: Pane, smoothness: number) {
         if (!p.viewer || !p.current) return;
@@ -352,8 +382,7 @@ export function initCubeViewer(render: () => void) {
         off.style.cssText = `position:fixed;left:-99999px;top:0;width:${w}px;height:${h}px;`;
         document.body.appendChild(off);
         const ev = (window as any).$3Dmol.createViewer(off, { backgroundColor: bg() });
-        ev.addModel(cubes[p.current], "cube");
-        applyStyleOn(ev);
+        buildModels(ev, cubes[p.current]);
         drawIsoOn(ev, p.current, 8);
         ev.setView(view); ev.render();
         const a = document.createElement("a");
@@ -414,22 +443,22 @@ export function initCubeViewer(render: () => void) {
         const f = presetInput.files?.[0]; if (!f) return;
         try {
             preset = JSON.parse(await f.text()); savePreset(preset);
-            allPanes(p => { p.viewer.setBackgroundColor(bg()); applyStyleOn(p.viewer); p.viewer.render(); });
+            allPanes(p => { p.viewer.setBackgroundColor(bg()); paneRedraw(p, true); });
         } catch (e) { console.warn("[cube] Preset-JSON ungültig:", e); }
     });
     document.getElementById("btn-cube-preset-clear")?.addEventListener("click", () => {
         preset = null; savePreset(null);
-        allPanes(p => { p.viewer.setBackgroundColor(bg()); applyStyleOn(p.viewer); p.viewer.render(); });
+        allPanes(p => { p.viewer.setBackgroundColor(bg()); paneRedraw(p, true); });
     });
 
     reprBtns.forEach(b => b.addEventListener("click", () => {
         reprBtns.forEach(x => x.classList.remove("active"));
         b.classList.add("active");
         repr = (b.dataset.cubeRepr as Repr) || "ballstick";
-        allPanes(p => { applyStyleOn(p.viewer); p.viewer.render(); });
+        allPanes(p => paneRedraw(p, true));
     }));
-    chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => { applyStyleOn(p.viewer); applyLabelsOn(p.viewer); p.viewer.render(); }); });
-    chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => { applyLabelsOn(p.viewer); p.viewer.render(); }); });
+    chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => paneRedraw(p, true)); });
+    chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => paneRedraw(p, true)); });
 
     let isoTimer: any = null;
     isoSlider?.addEventListener("input", () => {
