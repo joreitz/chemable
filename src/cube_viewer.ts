@@ -8,7 +8,8 @@ import { state } from "./state";
 
 type Repr = "ballstick" | "wire";
 interface AtomStyle { color?: string; scale?: number; stickRadius?: number; repr?: Repr; }
-interface Preset { name?: string; background?: string; default?: AtomStyle; elements?: { [el: string]: AtomStyle }; }
+interface Selection extends AtomStyle { index: string; }
+interface Preset { name?: string; background?: string; default?: AtomStyle; elements?: { [el: string]: AtomStyle }; selections?: Selection[]; }
 interface MOSource { header: string[]; rawData: string; nums: number[] | null; nmo: number; pts: number; }
 type ParseResult = { kind: "single"; cube: string } | { kind: "multi"; source: MOSource; labels: string[] };
 interface Pane { root: HTMLDivElement; body: HTMLDivElement; sel: HTMLSelectElement; viewer: any; current: string | null; isoShapes: any[]; }
@@ -20,7 +21,7 @@ const DEFAULTS: CubePrefs = { colorPlus: "#3b82f6", colorMinus: "#ef4444", iso: 
 
 // Z -> Symbol / kovalente Radien (Å) für die Bindungserkennung beim Canvas-Transfer
 const SYM = ["", "H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"];
-const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66,F:0.57,Si:1.11,P:1.07,S:1.05,Cl:1.02,Br:1.20,I:1.39,Se:1.20 };
+const RCOV: { [s: string]: number } = { H:0.31,B:0.84,C:0.76,N:0.71,O:0.66f,F:0.57,Si:1.11,P:1.07,S:1.05,Cl:1.02,Br:1.20,I:1.39,Se:1.20 };
 const BOHR = 0.529177;
 
 function loadPrefs(): CubePrefs {
@@ -54,6 +55,19 @@ function buildMOCube(src: MOSource, k: number): string {
     return src.header.concat(body).join("\n") + "\n";
 }
 function displayLabel(l: string): string { return /^-?\d+$/.test(l) ? "MO " + l : l; }
+function parseIndexSpec(spec: string): { set: Set<number>; invert: boolean } {
+    let s = spec.trim(); let invert = false;
+    if (s.startsWith("!")) { invert = true; s = s.slice(1); }
+    else if (/^\\.*\\$/.test(s)) { invert = true; s = s.replace(/\\/g, ""); }
+    const set = new Set<number>();
+    for (const part of s.split(",")) {
+        const p = part.trim(); if (!p) continue;
+        const m = p.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (m) { for (let i = Math.min(+m[1], +m[2]); i <= Math.max(+m[1], +m[2]); i++) set.add(i); }
+        else if (/^\d+$/.test(p)) set.add(+p);
+    }
+    return { set, invert };
+}
 function parseCubeMeta(text: string): ParseResult {
     const lines = text.split(/\r?\n/);
     const h3 = lines[2].trim().split(/\s+/);
@@ -162,11 +176,24 @@ export function initCubeViewer(render: () => void) {
         if (s.color) o.stick.color = s.color;
         return o;
     }
+    function applySelectionsOn(v: any) {
+    if (!preset?.selections) return;
+    const atoms = v.selectedAtoms({});                       // Reihenfolge = Datei-/ORCA-Reihenfolge
+    console.log("[cube] selections, atoms:", atoms.length);  // trial: läuft's? Atomzahl plausibel?
+    for (const sel of preset.selections) {
+        if (sel.index == null) continue;
+        const { set, invert } = parseIndexSpec(String(sel.index));
+        const picked = atoms.filter((_: any, i: number) => set.has(i + 1) !== invert)
+                            .map((a: any) => a.index);
+        if (picked.length) v.setStyle({ index: picked }, elemSpec(sel));
+    }
+}
     function applyStyleOn(v: any) {
         if (!v) return;
         v.setStyle({}, baseAtomSpec());
         if (preset?.default) v.setStyle({}, elemSpec(preset.default));
         if (preset?.elements) for (const [el, s] of Object.entries(preset.elements)) v.setStyle({ elem: el }, elemSpec(s));
+        applySelectionsOn(v);
         if (!showH) v.setStyle({ elem: "H" }, {});
     }
     function applyLabelsOn(v: any) {

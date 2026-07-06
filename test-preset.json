@@ -1,8 +1,19 @@
 {
-  "name": "CH-wire",
-  "background": "white",
+  "name": "Paper figure",          
+  "background": "white",          
+
+  "default": { "repr": "ballstick", "stickRadius": 0.10, "scale": 0.22 },
+
+
   "elements": {
-    "C": { "repr": "wire", "stickRadius": 0.03 },
-    "H": { "repr": "wire", "stickRadius": 0.03 }
-  }
+    "C":  { "color": "#333333" },
+    "H":  { "repr": "wire", "stickRadius": 0.03 },
+    "Fe": { "color": "#e06633", "scale": 0.35 }
+  },
+
+  "selections": [
+    { "index": "1-6",  "repr": "wire", "stickRadius": 0.03 },
+    { "index": "!1-6", "repr": "ballstick" },
+    { "index": "4,5,5", "color": "#3b82f6" }
+  ]
 }
