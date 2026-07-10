@@ -29,6 +29,7 @@ export function initStyleMenu(render: () => void) {
             let centerX = 0, centerY = 0;
             for (const a of atoms) { centerX += a.x; centerY += a.y; }
             centerX /= atoms.length;
+            centerY /= atoms.length; 
 
             for (const a of atoms) {
                 a.x = centerX + (a.x - centerX) * factor;

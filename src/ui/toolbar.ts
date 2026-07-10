@@ -7,7 +7,6 @@ import { generateSmiles } from "../smiles";
 import { generateHighResPNG } from "../export";
 
 const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type;
-const electron = isElectron ? (window as any).require('electron') : null;
 
 export function setMode(mode: any, activeBtnId?: string) {
         uiState.editMode = mode;
@@ -57,7 +56,7 @@ export function initToolbar(render: () => void, performUndo: () => void) {
     
     // Button-Text anpassen
     const btn = e.target as HTMLButtonElement;
-    btn.innerText = state.is3DMode ? "2D Modus" : "3D Modus";
+    btn.innerText = state.is3DMode ? "2D mode" : "3D mode";
     
     // Canvas neu zeichnen
     render(); 
@@ -72,15 +71,14 @@ export function initToolbar(render: () => void, performUndo: () => void) {
     const bonds = state.getBonds();
     
     if (atoms.length === 0) {
-        alert("Keine Struktur zum Exportieren vorhanden.");
+        alert("No structure to export.");
         return;
     }
 
     try {
         document.body.style.cursor = "wait";
         
-        // --- NEU: Schriftgröße direkt aus dem UI-Element auslesen ---
-        // WICHTIG: Passe die ID ('font-size-slider') an die tatsächliche ID deines HTML-Sliders an!
+
         let currentFontSize = 16;
         const fontSizeInput = document.getElementById('font-size-slider') as HTMLInputElement; 
         if (fontSizeInput) {
@@ -89,17 +87,22 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         
         // Schriftgröße als 3. Parameter übergeben
         const dataUrl = generateHighResPNG(atoms, bonds, currentFontSize);
-        
         if (dataUrl) {
-            const link = document.createElement('a');
-            link.download = 'molekuel.png';
-            link.href = dataUrl;
-            document.body.appendChild(link); 
+            const bin = atob(dataUrl.split(",")[1]);
+            const buf = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+            const url = URL.createObjectURL(new Blob([buf], { type: "image/png" }));
+
+            const link = document.createElement("a");
+            link.download = "molekuel.png";
+            link.href = url;
+            document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
     } catch (err) {
-        alert("Fehler beim Erstellen des PNGs: " + err);
+        alert("Error while creating PNGs: " + err);
     } finally {
         document.body.style.cursor = "default";
     }
@@ -145,7 +148,7 @@ export function initToolbar(render: () => void, performUndo: () => void) {
     document.getElementById('btn-clean')?.addEventListener('click', async () => {
         const smiles = generateSmiles(state.getAtoms(), state.getBonds());
         if (!smiles) {
-            alert("Das Zeichenbrett ist leer.");
+            alert("No structure to clean.");
             return;
         }
         
@@ -156,7 +159,7 @@ export function initToolbar(render: () => void, performUndo: () => void) {
             applySdfToCanvas(cleanSdf, render, false); 
             
         } catch (e) {
-            alert("Cleanup fehlgeschlagen: " + (e as Error).message);
+            alert("Cleanup failed: " + (e as Error).message);
         } finally {
             document.body.style.cursor = "default";
         }

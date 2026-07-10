@@ -12,8 +12,7 @@ interface Selection extends AtomStyle { index: string; layer?: boolean; }
 interface Preset { name?: string; background?: string; default?: AtomStyle; elements?: { [el: string]: AtomStyle }; selections?: Selection[]; }
 interface MOSource { header: string[]; rawData: string; nums: number[] | null; nmo: number; pts: number; }
 type ParseResult = { kind: "single"; cube: string } | { kind: "multi"; source: MOSource; labels: string[] };
-interface Pane { root: HTMLDivElement; body: HTMLDivElement; sel: HTMLSelectElement; viewer: any; current: string | null; isoShapes: any[]; }
-
+interface Pane { root: HTMLDivElement; body: HTMLDivElement; label: HTMLSpanElement; viewer: any; current: string | null; isoShapes: any[]; }
 const LS_KEY = "chemable.cubeviewer.prefs";
 const LS_PRESET = "chemable.cubeviewer.preset";
 interface CubePrefs { colorPlus: string; colorMinus: string; iso: number; }
@@ -156,14 +155,13 @@ export function initCubeViewer(render: () => void) {
     const grid      = document.getElementById("cube-grid");
     const fileInput = document.getElementById("cube-file-input") as HTMLInputElement;
     const presetInput = document.getElementById("cube-preset-input") as HTMLInputElement;
-    const isoSlider = document.getElementById("cube-iso") as HTMLInputElement;
     const isoNum    = document.getElementById("cube-iso-num") as HTMLInputElement;
     const colPlus   = document.getElementById("cube-col-plus") as HTMLInputElement;
     const colMinus  = document.getElementById("cube-col-minus") as HTMLInputElement;
     const chkH      = document.getElementById("cube-show-h") as HTMLInputElement;
     const chkLabel = document.getElementById("cube-show-label") as HTMLInputElement;
     const reprBtns  = document.querySelectorAll<HTMLButtonElement>("[data-cube-repr]");
-
+    let activePane: Pane | null = null;
     let cubes: { [name: string]: string } = {};
     let sources: { [key: string]: MOSource } = {};
     let entryToSrc: { [name: string]: { src: string; k: number } } = {};
@@ -179,9 +177,49 @@ export function initCubeViewer(render: () => void) {
 
     if (colPlus)   colPlus.value = prefs.colorPlus;
     if (colMinus)  colMinus.value = prefs.colorMinus;
-    if (isoSlider) isoSlider.value = String(prefs.iso);
+
     if (isoNum)    isoNum.value = String(prefs.iso);
 
+    let rail: HTMLDivElement | null = null;
+    if (grid) {
+        grid.style.position = "relative";
+        rail = document.createElement("div");
+        rail.id = "cube-rail";
+        rail.style.cssText =
+            "position:absolute;left:8px;top:8px;bottom:8px;width:150px;z-index:5;padding:6px;" +
+            "background:rgba(245,245,245,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);" +
+            "border:1px solid rgba(0,0,0,0.08);border-radius:8px;overflow-y:auto;display:none;";
+        grid.appendChild(rail);
+    }
+    function setActivePane(p: Pane | null) {
+        activePane = p;
+        panes.forEach(x => x.root.style.outline = x === p ? "2px solid #3b82f6" : "none");
+        refreshRail();
+    }
+    function selectVolume(name: string) {
+        if (!activePane) activePane = panes[0] ?? null;
+        if (!activePane) return;
+        activePane.current = name;
+        activePane.label.textContent = name;
+        paneRedraw(activePane, true);       // Kamera behalten
+        refreshRail();
+    }
+    function refreshRail() {
+        if (!rail) return;
+        rail.innerHTML = "";
+        entryNames.forEach(name => {
+            const on = activePane?.current === name;
+            const item = document.createElement("button");
+            item.textContent = name;
+            item.style.cssText =
+                "display:block;width:100%;text-align:left;margin:2px 0;padding:6px 8px;border:none;border-radius:6px;" +
+                "font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" +
+                (on ? "background:#3b82f6;color:#fff;font-weight:600;" : "background:rgba(255,255,255,0.55);color:#222;");
+            item.addEventListener("click", () => selectVolume(name));
+            rail!.appendChild(item);
+        });
+        rail.style.display = entryNames.length ? "block" : "none";
+    }
     function bg(): string { return preset?.background || "white"; }
     function materialize(name: string) {
         if (cubes[name]) return;
@@ -197,7 +235,7 @@ export function initCubeViewer(render: () => void) {
         return repr === "ballstick" ? { stick: { radius: 0.12 }, sphere: { scale: 0.25 } } : { stick: { radius: 0.05 } };
     }
     function elemSpec(s: AtomStyle): any {
-        const r = s.repr ?? repr;                       // Preset gewinnt, sonst Toolbar-Buttons
+        const r = s.repr ?? repr;                       // Preset gewinnt
         if (r === "ballstick") {
             const o: any = { stick: { radius: s.stickRadius ?? 0.12 }, sphere: { scale: s.scale ?? 0.25 } };
             if (s.color) { o.stick.color = s.color; o.sphere.color = s.color; }
@@ -271,7 +309,6 @@ export function initCubeViewer(render: () => void) {
     }
     function drawIsoOn(v: any, name: string, smoothness: number): any[] {
         const vol = getVol(name);
-        const val = parseFloat(isoSlider.value);
         return [
             v.addIsosurface(vol, { isoval:  val, color: prefs.colorPlus,  opacity: 0.85, smoothness }),
             v.addIsosurface(vol, { isoval: -val, color: prefs.colorMinus, opacity: 0.85, smoothness }),
@@ -308,36 +345,43 @@ export function initCubeViewer(render: () => void) {
         root.style.cssText = "display:flex;flex-direction:column;min-width:220px;min-height:200px;border:1px solid rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;flex:1;";
         const bar = document.createElement("div");
         bar.style.cssText = "display:flex;gap:6px;align-items:center;padding:4px 6px;background:rgba(0,0,0,0.03);";
-        const sel = document.createElement("select");
-        sel.style.cssText = "flex:1;padding:3px;border-radius:5px;font-size:12px;";
+        const label = document.createElement("span");
+        label.style.cssText = "flex:1;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
         const close = document.createElement("button");
-        close.textContent = "×"; close.title = "Pane schließen"; close.style.cssText = "padding:0 8px;font-size:14px;";
+        close.textContent = "×"; close.title = "Close pane"; close.style.cssText = "padding:0 8px;font-size:14px;";
         const body = document.createElement("div");
         body.style.cssText = "flex:1;position:relative;background:#fff;";
-        bar.append(sel, close); root.append(bar, body); grid!.appendChild(root);
+        bar.append(label, close); root.append(bar, body); grid!.appendChild(root);
 
-        const p: Pane = { root, body, sel, viewer: null, current: moName ?? entryNames[0] ?? null, isoShapes: [] };
+        const p: Pane = { root, body, label, viewer: null, current: moName ?? entryNames[0] ?? null, isoShapes: [] };
+        label.textContent = p.current ?? "—";
         p.viewer = (window as any).$3Dmol.createViewer(body, { backgroundColor: bg() });
-        fillSelect(sel, p.current);
-        sel.addEventListener("change", () => { p.current = sel.value; paneRedraw(p, true); });
-        close.addEventListener("click", () => {
+        root.addEventListener("pointerdown", () => setActivePane(p));
+        close.addEventListener("click", (e) => {
+            e.stopPropagation();
             if (panes.length <= 1) return;
-            panes.splice(panes.indexOf(p), 1); root.remove(); resizeAll();
+            panes.splice(panes.indexOf(p), 1); root.remove();
+            if (activePane === p) setActivePane(panes[0] ?? null);
+            resizeAll();
         });
         new ResizeObserver(() => p.viewer?.resize()).observe(body);
         panes.push(p);
+        setActivePane(p);
         if (p.current) paneRedraw(p, false);
-        requestAnimationFrame(() => { p.viewer?.zoomTo(); p.viewer?.render(); });  // erzwingt sichtbares erstes Frame
+        requestAnimationFrame(() => p.viewer?.resize());
         return p;
     }
     function resetSession() {
         cubes = {}; sources = {}; entryToSrc = {}; entryNames = []; volCache = {};
         while (panes.length) { const p = panes.pop()!; try { p.viewer?.clear(); } catch {} p.root.remove(); }
+        refreshRail();
+        resetSession();
     }
     async function ingest(files: File[]) {
         const cubeFiles = files.filter(f => /\.cube?$/i.test(f.name));
         if (!cubeFiles.length) return;
-        resetSession();
+        activePane = null;
+        
         for (const f of cubeFiles) {
             const text = await f.text();
             const base = f.name.replace(/\.cube?$/i, "");
@@ -372,7 +416,6 @@ export function initCubeViewer(render: () => void) {
         if (Number.isNaN(v)) return;
         v = Math.max(0.0001, v);
         if (isoNum) isoNum.value = String(v);
-        if (isoSlider) isoSlider.value = String(Math.min(v, parseFloat(isoSlider.max)));
         prefs.iso = v; savePrefs(prefs);
         allPanes(p => paneIso(p, 5));
     }
@@ -471,13 +514,15 @@ export function initCubeViewer(render: () => void) {
     chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => paneRedraw(p, true)); });
 
     let isoTimer: any = null;
-    isoSlider?.addEventListener("input", () => {
-        const v = parseFloat(isoSlider.value);
-        if (isoNum) isoNum.value = String(v);
+    isoNum?.addEventListener("input", () => {
+        const v = parseFloat(isoNum.value);
+        if (Number.isNaN(v)) return;
         clearTimeout(isoTimer);
-        allPanes(p => paneIso(p, 1));
-        isoTimer = setTimeout(() => { prefs.iso = v; savePrefs(prefs); allPanes(p => paneIso(p, 5)); }, 120);
+        allPanes(p => paneIso(p, 1));      
+        isoTimer = setTimeout(() => setIso(v), 150);
     });
+    const val = parseFloat(isoNum.value) || prefs.iso;
+
     isoNum?.addEventListener("change", () => setIso(parseFloat(isoNum.value)));
     colPlus?.addEventListener("input",  () => { prefs.colorPlus  = colPlus.value;  savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
     colMinus?.addEventListener("input", () => { prefs.colorMinus = colMinus.value; savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
