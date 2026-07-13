@@ -80,13 +80,11 @@ export function initToolbar(render: () => void, performUndo: () => void) {
         
 
         let currentFontSize = 16;
-        const fontSizeInput = document.getElementById('font-size-slider') as HTMLInputElement; 
-        if (fontSizeInput) {
-            currentFontSize = parseInt(fontSizeInput.value) || 16;
-        }
+        const fontSizeInput = document.getElementById('font-size-slider') as HTMLInputElement;
+        if (fontSizeInput) { currentFontSize = parseInt(fontSizeInput.value) || 16; }
         
         // Schriftgröße als 3. Parameter übergeben
-        const dataUrl = generateHighResPNG(atoms, bonds, currentFontSize);
+        const dataUrl = generateHighResPNG(atoms, bonds, uiState.currentFontSize);
         if (dataUrl) {
             const bin = atob(dataUrl.split(",")[1]);
             const buf = new Uint8Array(bin.length);

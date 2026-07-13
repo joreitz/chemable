@@ -1,6 +1,3 @@
-// src/draw.ts
-import { verboose } from "./renderer";
-
 import { Atom, Bond } from "./types";
 import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
@@ -53,53 +50,8 @@ export interface DrawOptions {
     globalFontFamily: string;
     globalColor: string;        
     showImplicitHydrogens: boolean;
-}
-
-function getNeighborCoords(
-    atomA: Atom, 
-    atomB: Atom, 
-    allBonds: Bond[], 
-    allAtoms: Atom[]
-): { x: number, y: number }[] {
-    const neighbors: { x: number, y: number }[] = [];
-
-    // Wir schauen uns jede Bindung an
-    for (const bond of allBonds) {
-        // Fall 1: Bindung hängt an Atom A
-        if (bond.id1 === atomA.id || bond.id2 === atomA.id) {
-            // Das "andere" Atom finden
-            const otherId = (bond.id1 === atomA.id) ? bond.id2 : bond.id1;
-            
-            // Wichtig: Wir wollen nicht Atom B als Nachbar von A zählen 
-            // (das ist ja die Bindung, die wir gerade zeichnen!)
-            if (otherId !== atomB.id) {
-                const neighbor = allAtoms.find(a => a.id === otherId);
-                if (neighbor) neighbors.push({ x: neighbor.x, y: neighbor.y });
-            }
-        }
-
-        // Fall 2: Bindung hängt an Atom B
-        if (bond.id1 === atomB.id || bond.id2 === atomB.id) {
-            const otherId = (bond.id1 === atomB.id) ? bond.id2 : bond.id1;
-            
-            // Wichtig: Nicht Atom A als Nachbar zählen
-            if (otherId !== atomA.id) {
-                const neighbor = allAtoms.find(a => a.id === otherId);
-                if (neighbor) neighbors.push({ x: neighbor.x, y: neighbor.y });
-            }
-        }
-    }
-
-    return neighbors;
-}
-
-function getAtomRadius(atom: any, ctx: CanvasRenderingContext2D, fontSize: number): number {
-    if (atom.element === 'C' && !atom.customLabel) return 0;
-    
-    const label = atom.customLabel ? atom.customLabel : atom.element;
-    const textWidth = ctx.measureText(label.charAt(0)).width; 
-    
-    return Math.max(fontSize * 0.75, (textWidth / 2) + (fontSize * 0.25));
+    globalLineWidth?: number;
+    atomPadding?: number;   
 }
 
 export function drawScene(
@@ -143,11 +95,10 @@ export function drawScene(
         ctx.restore();
     }
 
-    // --- PAINTER'S ALGORITHM VORBEREITUNG ---
+    // --- PAINTER'S ALGORITHM ---
     const drawables: any[] = [];
     const atomData = new Map<number, any>();
 
-    // 1. Alle Atome vorbereiten und Größen berechnen
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
@@ -203,7 +154,6 @@ export function drawScene(
         }
     }
 
-    // 2. Alle Bindungen vorbereiten
     for (const bond of bonds) {
         const a1 = atoms.find(a => a.id === bond.id1);
         const a2 = atoms.find(a => a.id === bond.id2);
@@ -216,10 +166,8 @@ export function drawScene(
         drawables.push({ type: 'bond', z: avgZ, bond, a1, a2 });
     }
 
-    // 3. NACH TIEFE SORTIEREN (Hinten liegende Objekte zuerst zeichnen)
     drawables.sort((a, b) => a.z - b.z);
 
-    // 4. ALLES ZEICHNEN
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
@@ -239,8 +187,9 @@ export function drawScene(
             const absCos = Math.abs(dx / len);
             const absSin = Math.abs(dy / len);
             
-            const r1 = (data1 && !data1.isHidden) ? (absCos * (data1.elemWidth / 2 + 4) + absSin * (data1.currentFontSize * 0.6)) : 0;
-            const r2 = (data2 && !data2.isHidden) ? (absCos * (data2.elemWidth / 2 + 4) + absSin * (data2.currentFontSize * 0.6)) : 0;
+            const pad = options.atomPadding ?? 4;
+            const r1 = (data1 && !data1.isHidden) ? (absCos * (data1.elemWidth / 2 + pad) + absSin * (data1.currentFontSize * 0.6)) : 0;
+            const r2 = (data2 && !data2.isHidden) ? (absCos * (data2.elemWidth / 2 + pad) + absSin * (data2.currentFontSize * 0.6)) : 0;
 
             // Wenn die Atome extrem nah aneinander liegen, brechen wir ab
             if (len <= r1 + r2) continue; 
@@ -258,7 +207,8 @@ export function drawScene(
 
             ctx.globalAlpha = 1.0; 
 
-            ctx.lineWidth = Math.min(6, Math.max(0.5, 2 + (item.z * 0.06)));
+            const lw = options.globalLineWidth ?? 2;
+            ctx.lineWidth = Math.min(lw * 3, Math.max(0.5, lw + (item.z * 0.06)));
             ctx.strokeStyle = bond.color || options.globalColor;
             
             let offset = bond.spacing || options.globalBondSpacing;

@@ -1,102 +1,89 @@
-// src/ui/style-menu.ts
 import { state } from "../state";
 import { uiState } from "../core/ui-state";
 
+const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T | null;
+
 export function initStyleMenu(render: () => void) {
-   
-    const fontSlider = document.getElementById('font-size-slider') as HTMLInputElement;
-    if (fontSlider) fontSlider.value = uiState.currentFontSize.toString()
-    const fontVal = document.getElementById('font-size-val');
-    fontSlider?.addEventListener('input', () => {
-        uiState.currentFontSize = parseInt(fontSlider.value);
-        if (fontVal) fontVal.innerText = uiState.currentFontSize.toString();
-        render();
+    const panel = $("style-panel");
+    $("btn-style-menu")?.addEventListener("click", () => {
+        if (!panel) return;
+        const wasOpen = panel.style.display === "block";
+        panel.style.display = wasOpen ? "none" : "block";
+        if (!wasOpen) syncFields();
     });
+    $("btn-close-style-panel")?.addEventListener("click", () => { if (panel) panel.style.display = "none"; });
 
-    const bondLengthSlider = document.getElementById('bond-length-slider') as HTMLInputElement;
-    const bondLengthVal = document.getElementById('bond-length-val');
-    let preSlideStateSaved = false;
+    // Generischer Binder: liest IMMER aus dem Feld (nie aus einem Slider-Max gedeckelt)
+    function bindNum(id: string, apply: (v: number) => void) {
+        const el = $<HTMLInputElement>(id);
+        el?.addEventListener("change", () => {
+            const v = parseFloat(el.value);
+            if (Number.isNaN(v)) return;
+            state.saveState();
+            apply(v);
+            uiState.saveStyle();
+            render();
+        });
+    }
 
-    bondLengthSlider?.addEventListener('input', (e) => {
-        if (!preSlideStateSaved) { state.saveState(); preSlideStateSaved = true; }
+    bindNum("style-font-size",    v => uiState.currentFontSize = v);
+    bindNum("style-line-width",   v => uiState.globalLineWidth = v);
+    bindNum("style-bond-spacing", v => uiState.globalBondSpacing = v);
+    bindNum("style-atom-padding", v => uiState.atomPadding = v);
 
-        const newLength = parseInt(bondLengthSlider.value);
-        if (bondLengthVal) bondLengthVal.innerText = newLength.toString();
-
+    // Bond length: reskaliert bestehende Geometrie um den Zentroid
+    bindNum("style-bond-length", v => {
         const atoms = state.getAtoms();
-        if (atoms.length > 0) {
-            const factor = newLength / uiState.currentBondLength;
-            let centerX = 0, centerY = 0;
-            for (const a of atoms) { centerX += a.x; centerY += a.y; }
-            centerX /= atoms.length;
-            centerY /= atoms.length; 
-
-            for (const a of atoms) {
-                a.x = centerX + (a.x - centerX) * factor;
-                a.y = centerY + (a.y - centerY) * factor;
-            }
+        if (atoms.length > 0 && uiState.currentBondLength > 0) {
+            const f = v / uiState.currentBondLength;
+            let cx = 0, cy = 0;
+            for (const a of atoms) { cx += a.x; cy += a.y; }
+            cx /= atoms.length; cy /= atoms.length;   // BEIDE teilen — sonst Zentroid-Drift
+            for (const a of atoms) { a.x = cx + (a.x - cx) * f; a.y = cy + (a.y - cy) * f; }
         }
-        uiState.currentBondLength = newLength;
-        render();
-    });
-    bondLengthSlider?.addEventListener('change', () => { preSlideStateSaved = false; });
-
-    // --- STYLE PANEL (Farbe, Abstand, Schriftart) ---
-    const stylePanel = document.getElementById('style-panel');
-    const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
-    const spacingSlider = document.getElementById('bond-spacing-slider') as HTMLInputElement;
-    const spacingVal = document.getElementById('bond-spacing-val');
-    const fontSelect = document.getElementById('font-family-select') as HTMLSelectElement;
-
-    document.getElementById('btn-style-menu')?.addEventListener('click', () => {
-        if (stylePanel) stylePanel.style.display = stylePanel.style.display === 'block' ? 'none' : 'block';
-    });
-    document.getElementById('btn-close-style-panel')?.addEventListener('click', () => {
-        if (stylePanel) stylePanel.style.display = 'none';
+        uiState.currentBondLength = v;
     });
 
-    let preStyleStateSaved = false;
-    colorPicker?.addEventListener('change', () => { preStyleStateSaved = false; });
-    spacingSlider?.addEventListener('change', () => { preStyleStateSaved = false; });
-
-    colorPicker?.addEventListener('input', () => {
-        const newColor = colorPicker.value;
-        const selectedIds = state.getSelectedAtomIds();
-        if (!preStyleStateSaved) { state.saveState(); preStyleStateSaved = true; }
-        
-        if (selectedIds.size > 0) {
-            state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.color = newColor; });
-            state.getBonds().forEach(b => { if (selectedIds.has(b.id1) && selectedIds.has(b.id2)) b.color = newColor; });
-        } else {
-            uiState.globalColor = newColor; 
-        }
-        render();
-    });
-
-    spacingSlider?.addEventListener('input', () => {
-        const newSpacing = parseFloat(spacingSlider.value);
-        if (spacingVal) spacingVal.innerText = newSpacing.toString();
-        const selectedIds = state.getSelectedAtomIds();
-        
-        if (!preStyleStateSaved) { state.saveState(); preStyleStateSaved = true; }
-        
-        if (selectedIds.size > 0) {
-            state.getBonds().forEach(b => { if (selectedIds.has(b.id1) && selectedIds.has(b.id2)) b.spacing = newSpacing; });
-        } else {
-            uiState.globalBondSpacing = newSpacing;
-        }
-        render();
-    });
-
-    fontSelect?.addEventListener('change', () => {
-        const newFont = fontSelect.value;
-        const selectedIds = state.getSelectedAtomIds();
+    // Selektion → lokal, sonst global
+    $<HTMLSelectElement>("style-font-family")?.addEventListener("change", function () {
+        const sel = state.getSelectedAtomIds();
         state.saveState();
-        if (selectedIds.size > 0) {
-            state.getAtoms().forEach(a => { if (selectedIds.has(a.id)) a.fontFamily = newFont; });
-        } else {
-            uiState.globalFontFamily = newFont;
-        }
-        render();
+        if (sel.size > 0) state.getAtoms().forEach(a => { if (sel.has(a.id)) a.fontFamily = this.value; });
+        else uiState.globalFontFamily = this.value;
+        uiState.saveStyle(); render();
     });
+    $<HTMLInputElement>("style-color")?.addEventListener("input", function () {
+        const sel = state.getSelectedAtomIds();
+        if (sel.size > 0) {
+            state.getAtoms().forEach(a => { if (sel.has(a.id)) a.color = this.value; });
+            state.getBonds().forEach(b => { if (sel.has(b.id1) && sel.has(b.id2)) b.color = this.value; });
+        } else uiState.globalColor = this.value;
+        uiState.saveStyle(); render();
+    });
+
+    $<HTMLInputElement>("style-export-transparent")?.addEventListener("change", function () {
+        uiState.exportTransparent = this.checked; uiState.saveStyle();
+    });
+
+    $("btn-style-reset")?.addEventListener("click", () => {
+        state.saveState();
+        uiState.resetStyle();
+        syncFields(); render();
+    });
+
+    function syncFields() {
+        const set = (id: string, v: string | boolean) => {
+            const el = $<HTMLInputElement>(id); if (!el) return;
+            if (typeof v === "boolean") el.checked = v; else el.value = v;
+        };
+        set("style-font-size",    String(uiState.currentFontSize));
+        set("style-line-width",   String(uiState.globalLineWidth));
+        set("style-bond-length",  String(uiState.currentBondLength));
+        set("style-bond-spacing", String(uiState.globalBondSpacing));
+        set("style-atom-padding", String(uiState.atomPadding));
+        set("style-font-family",  uiState.globalFontFamily);
+        set("style-color",        uiState.globalColor);
+        set("style-export-transparent", uiState.exportTransparent);
+    }
+    syncFields();
 }

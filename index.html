@@ -18,7 +18,9 @@
             --glass-border: rgba(255, 255, 255, 0.5);
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
         }
-
+        
+        .modal input[type="number"], .modal select { border:1px solid #ccc; border-radius:6px; padding:6px; width:100%; outline:none; box-sizing:border-box; }
+        
         body { 
             margin: 0; padding: 0; overflow: hidden; 
             background-color: #f3f4f6; 
@@ -375,28 +377,34 @@
             </div>
     </div>
     
-    <div id="style-panel" class="modal" style="display: none; position: absolute; top: 90px; left: 200px; padding: 20px; width: 240px; z-index: 1000;">
-        <h3>Properties</h3>
-        <div style="margin-bottom: 15px;">
-            <label for="color-picker" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Color (Local/Global):</label>
-            <input type="color" id="color-picker" value="#000000" style="width: 100%; height: 35px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; padding: 2px;">
+    <div id="style-panel" class="modal" style="display:none; position:absolute; top:90px; left:200px; padding:20px; width:270px; z-index:1000;">
+        <h3>Style</h3>
+        <div style="display:grid; grid-template-columns:1fr 95px; gap:10px 8px; align-items:center; font-size:13px;">
+            <label style="font-weight:bold;">Font</label>
+            <select id="style-font-family"><option>Arial</option><option>Times New Roman</option><option value="Courier New">Courier</option><option>Georgia</option><option>Verdana</option></select>
+
+            <label style="font-weight:bold;">Font size (px)</label>
+            <input type="number" id="style-font-size" min="8" max="72" step="1">
+
+            <label style="font-weight:bold;">Line width (px)</label>
+            <input type="number" id="style-line-width" min="0.5" max="8" step="0.5">
+
+            <label style="font-weight:bold;">Bond length (px)</label>
+            <input type="number" id="style-bond-length" min="10" max="300" step="5">
+
+            <label style="font-weight:bold;">Bond spacing (px)</label>
+            <input type="number" id="style-bond-spacing" min="2" max="12" step="0.5">
+
+            <label style="font-weight:bold;" title="Freiraum zwischen Label und Bindungsende">Atom clearance (px)</label>
+            <input type="number" id="style-atom-padding" min="0" max="20" step="1">
+
+            <label style="font-weight:bold;">Color</label>
+            <input type="color" id="style-color" style="height:32px; padding:2px;">
+
+            <label style="font-weight:bold;">PNG transparent</label>
+            <input type="checkbox" id="style-export-transparent" style="justify-self:start;">
         </div>
-        <div style="margin-bottom: 15px;">
-            <label for="bond-spacing-slider" style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; font-weight: bold;">
-                <span>Bond Spacing:</span> <span style="font-weight: normal;"><span id="bond-spacing-val">5</span>px</span>
-            </label>
-            <input type="range" id="bond-spacing-slider" min="2" max="12" value="5" style="width: 100%;">
-        </div>
-        <div style="margin-bottom: 20px;">
-            <label for="font-family-select" style="display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold;">Font Family:</label>
-            <select id="font-family-select" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none;">
-                <option value="Arial">Arial</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Courier New">Courier</option>
-                <option value="Georgia">Georgia</option>
-                <option value="Verdana">Verdana</option>
-            </select>
-        </div>
+        <button id="btn-style-reset" class="btn-secondary" style="margin-top:15px;">Reset defaults</button>
         <button id="btn-close-style-panel" class="btn-secondary">Close</button>
     </div>
 

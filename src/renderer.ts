@@ -29,6 +29,7 @@ import { initMoleculeData } from "./moldata/ui";
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
+
 // --- RENDER-FUNKTION ---
 function render() {
     drawScene(ctx, canvas.width, canvas.height, state.getAtoms(), state.getBonds(), {
@@ -45,7 +46,9 @@ function render() {
         globalBondSpacing: uiState.globalBondSpacing,
         globalFontFamily: uiState.globalFontFamily,
         globalColor: uiState.globalColor,
-        showImplicitHydrogens: uiState.showImplicitHydrogens
+        showImplicitHydrogens: uiState.showImplicitHydrogens,
+        globalLineWidth: uiState.globalLineWidth,
+        atomPadding: uiState.atomPadding,
     });
 
     if (pendingTemplatePreview) {
