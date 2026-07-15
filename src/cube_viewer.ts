@@ -309,11 +309,13 @@ export function initCubeViewer(render: () => void) {
     }
     function drawIsoOn(v: any, name: string, smoothness: number): any[] {
         const vol = getVol(name);
+        const val = prefs.iso;   
         return [
             v.addIsosurface(vol, { isoval:  val, color: prefs.colorPlus,  opacity: 0.85, smoothness }),
             v.addIsosurface(vol, { isoval: -val, color: prefs.colorMinus, opacity: 0.85, smoothness }),
         ];
     }
+    
     function paneRedraw(p: Pane, keepView: boolean) {
         if (!p.viewer || !p.current) return;
         const keep = keepView ? p.viewer.getView() : null;
@@ -373,9 +375,10 @@ export function initCubeViewer(render: () => void) {
     }
     function resetSession() {
         cubes = {}; sources = {}; entryToSrc = {}; entryNames = []; volCache = {};
+        activePane = null;
         while (panes.length) { const p = panes.pop()!; try { p.viewer?.clear(); } catch {} p.root.remove(); }
         refreshRail();
-        resetSession();
+        // resetSession();  ← LÖSCHEN: rief sich selbst auf
     }
     async function ingest(files: File[]) {
         const cubeFiles = files.filter(f => /\.cube?$/i.test(f.name));
@@ -414,7 +417,7 @@ export function initCubeViewer(render: () => void) {
 
     function setIso(v: number) {
         if (Number.isNaN(v)) return;
-        v = Math.max(0.0001, v);
+        v = Math.min(1, Math.max(0.0001, v));
         if (isoNum) isoNum.value = String(v);
         prefs.iso = v; savePrefs(prefs);
         allPanes(p => paneIso(p, 5));
@@ -516,14 +519,18 @@ export function initCubeViewer(render: () => void) {
     let isoTimer: any = null;
     isoNum?.addEventListener("input", () => {
         const v = parseFloat(isoNum.value);
-        if (Number.isNaN(v)) return;
+        if (Number.isNaN(v) || v <= 0) return;              // "", "0", "0." beim Tippen: abwarten, nichts zurückschreiben
+        prefs.iso = Math.min(1, Math.max(0.0001, v));       // nur intern clampen
         clearTimeout(isoTimer);
-        allPanes(p => paneIso(p, 1));      
-        isoTimer = setTimeout(() => setIso(v), 150);
+        allPanes(p => paneIso(p, 1));                       // grober Live-Redraw
+        isoTimer = setTimeout(() => { savePrefs(prefs); allPanes(p => paneIso(p, 5)); }, 150);
     });
     const val = parseFloat(isoNum.value) || prefs.iso;
-
-    isoNum?.addEventListener("change", () => setIso(parseFloat(isoNum.value)));
+    isoNum?.addEventListener("change", () => {              // blur/Enter: 
+        let v = parseFloat(isoNum.value);
+        if (Number.isNaN(v)) v = prefs.iso;                 // leeres Feld 
+        setIso(v);
+    });
     colPlus?.addEventListener("input",  () => { prefs.colorPlus  = colPlus.value;  savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
     colMinus?.addEventListener("input", () => { prefs.colorMinus = colMinus.value; savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
 
@@ -562,10 +569,10 @@ export function initCubeViewer(render: () => void) {
         handle.addEventListener("pointermove", (e) => {
             if (!dragging) return;
             const w = dialog.offsetWidth;
-            const V = 120; // so viel bleibt garantiert greifbar
+            const V = 120; 
             let x = e.clientX - ox, y = e.clientY - oy;
-            x = Math.max(V - w, Math.min(x, window.innerWidth  - w)); // rechte Kante/Handle bleibt sichtbar
-            y = Math.max(0,     Math.min(y, window.innerHeight - V)); // Titelleiste bleibt oben drin
+            x = Math.max(V - w, Math.min(x, window.innerWidth  - w)); 
+            y = Math.max(0,     Math.min(y, window.innerHeight - V)); 
             dialog.style.left = x + "px";
             dialog.style.top  = y + "px";
         });
@@ -581,6 +588,8 @@ export function initCubeViewer(render: () => void) {
         resizeAll();
     });
     document.getElementById("btn-cube-close")?.addEventListener("click", () => {
+        resetSession();
+        if (fileInput) fileInput.value = "";   // sonst feuert 'change' nicht beim erneuten Wählen derselben Datei
         if (dialog) dialog.style.display = "none";
     });
     
