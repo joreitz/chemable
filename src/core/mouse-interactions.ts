@@ -5,10 +5,13 @@ import { setMode } from "../ui/toolbar";
 import { calculateNewAtomPosition } from "../chemistry";
 import { MOLECULE_TEMPLATES, TemplateData } from "../templates";
 import { Atom, Bond } from "../types";
-import { pendingTemplate, cancelTemplate, updateTemplatePreview, placeTemplate } from "../chemistry/template-manager";
+// src/core/mouse-interactions.ts  — Import-Zeile 8 ersetzen
+import { pendingTemplate, templatePhase, cancelTemplate, templateBack,
+         beginTemplateOrient, updateTemplatePreview, placeTemplate } from "../chemistry/template-manager";
 import { initTextEditor, openTextEditor } from "../ui/text-editor"
 import { rotateAtoms3D } from "./projection-3d";
-
+import { initContextMenu, openContextMenu, closeContextMenu } from "../ui/context-menu";
+let rotationSaved = false;
 let movingAtom: Atom | null = null;
 let lastPanMouseX = 0;
 let lastPanMouseY = 0;
@@ -24,7 +27,6 @@ let isRotating3D = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
 let alignSelection: Atom[] = [];
-// ...
 
 export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) {
     let activeChargeAtom: any = null;
@@ -39,7 +41,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         }
     
         if (e.button === 2 && pendingTemplate) {
-            cancelTemplate(render);
+            templateBack(render);          
             return; 
         }
 
@@ -68,7 +70,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
                     const cx = (a1.x + a2.x) / 2;
                     const cy = (a1.y + a2.y) / 2;
 
-                    state.saveState();
+                    rotationSaved = false;
                     atoms.forEach(a => {
                         const rot = rotatePoint({x: a.x, y: a.y}, {x: cx, y: cy}, deltaAngle);
                         a.x = rot.x;
@@ -88,7 +90,8 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         }
     
         if (pendingTemplate && e.button === 0) {
-            placeTemplate(render);
+            if (templatePhase === "hover") beginTemplateOrient(uiState.currentMouseX, uiState.currentMouseY, render);
+            else placeTemplate(render);
             return;
         }
 
@@ -237,7 +240,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         }
     
         if (pendingTemplate) {
-            updateTemplatePreview(uiState.currentMouseX, uiState.currentMouseY, render);
+            updateTemplatePreview(uiState.currentMouseX, uiState.currentMouseY, render, e.ctrlKey);            
             return; 
         }
         
@@ -266,6 +269,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             render();
         }
         else if (isRotating) {
+            if (!rotationSaved) { state.saveState(); rotationSaved = true; }
             const currentAngle = angleOfMouseMovement({x: uiState.currentMouseX, y: uiState.currentMouseY}, rotationcenter);
             const startAngle = angleOfMouseMovement({x: uiState.dragStartX, y: uiState.dragStartY}, rotationcenter);
             const angleDelta = currentAngle - startAngle;
@@ -362,7 +366,8 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         if (isRotating) {
             isRotating = false;
             initialAtomPosition.clear();
-            state.saveState();
+            if (!rotationSaved) openContextMenu(e.clientX, e.clientY);   // Klick ohne Drag = Menü
+            rotationSaved = false;
             return;
         }
 
@@ -504,4 +509,7 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         }
         render();
     });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('mousedown', () => closeContextMenu(), true);
+    initContextMenu(render);
 }

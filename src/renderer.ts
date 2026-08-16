@@ -7,6 +7,7 @@ import { ehtPlugin } from "./plugins/eht";
 import { knowitallPlugin } from "./plugins/knowitall"; // KnowItAll als Plugin laden
 import { registerPlugin, triggerPluginStateChange, setPluginRenderHook } from "./plugin-manager";
 import { initRDKit } from "./chemistry/rdkit-3d";
+import { initUpdater } from "./io/updater";
 
 import { state } from "./state";
 import { drawScene } from "./draw";
@@ -135,6 +136,7 @@ registerPlugin(analyzerPlugin);
 
 initMoleculeData();
 initRDKit();
+initUpdater();
 init3DViewer(render);
 initToolbar(render, performUndo);
 initMouseHandler(canvas, render);

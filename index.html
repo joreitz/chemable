@@ -222,6 +222,7 @@
                 <hr class="divider">
                 <button id="btn-export-svg"> Export as SVG</button>
                 <button id="btn-export-png"> Export as PNG</button>
+                <button id="btn-import-xyz"> Import .xyz</button>
                 <button id="btn-export-xyz"> Export as .xyz</button>
                 <button id="btn-smiles"> SMILES in-/export</button>
             </div>
@@ -258,6 +259,13 @@
             <div class="dropdown-content" id="plugin-dropdown-content">
                 </div>
             <div id="plugin-info-area" style="display:none;"></div>
+        </div>
+
+        <div class="dropdown">
+            <button class="menu-btn"> Help </button>
+            <div class="dropdown-content">
+                <button id="btn-check-update">Check for updates…</button>
+            </div>
         </div>
 
         <div class="slider-group">
@@ -409,7 +417,8 @@
     </div>
 
     <input type="file" id="file-load" style="display: none;" accept=".chem,.svg">
-    
+    <input type="file" id="file-load" style="display: none;" accept=".chem,.svg">
+    <input type="file" id="xyz-file-input" accept=".xyz" style="display:none">
     <div id="viewer3d-dialog" class="modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); padding:20px; width: 600px; height: 500px; z-index:2000; flex-direction:column; box-shadow: 0 25px 50px rgba(0,0,0,0.5);">
         <h3 style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
             3D Structure
@@ -425,64 +434,73 @@
 
     <div id="cube-dialog" class="modal" style="display:none; padding:0; flex-direction:row; overflow:hidden;">
     <div id="cube-grid" style="flex:1; min-width:0; display:flex; gap:8px; padding:8px; overflow:hidden;"></div>
-    <div style="width:240px; flex-shrink:0; padding:16px; display:flex; flex-direction:column; gap:14px;
-        border-left:1px solid rgba(0,0,0,0.1); overflow:auto;">
+    <div style="width:240px; flex-shrink:0; padding:14px; display:flex; flex-direction:column; gap:10px;
+        border-left:1px solid rgba(0,0,0,0.1); overflow:auto; font-size:12px;">
         <h3 id="cube-drag-handle" style="margin:0; cursor:move;">Cube / MO Viewer</h3>
 
-        <label style="font-size:12px; font-weight:600;">Load .cube-files</label>
-        <input type="file" id="cube-file-input" accept=".cube,.cub" multiple>
+        <details open>
+            <summary style="font-weight:600; cursor:pointer;">Files</summary>
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px;">
+                <input type="file" id="cube-file-input" accept=".cube,.cub" multiple>
+                <label style="font-weight:600;">Preset (JSON)</label>
+                <input type="file" id="cube-preset-input" accept=".json,application/json">
+                <button id="btn-cube-preset-clear" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Remove preset</button>
+            </div>
+        </details>
 
-        <label style="font-size:12px; font-weight:600;">Panels</label>
-        <div style="display:flex; gap:6px;">
-            <button id="btn-cube-add-pane" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;">+ Panel</button>
-            <button id="btn-cube-sync" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;" title="Ansicht von Panel 1 auf alle">Sync View</button>
-        </div>
+        <details open>
+            <summary style="font-weight:600; cursor:pointer;">Panels & view</summary>
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px;">
+                <div style="display:flex; gap:6px;">
+                    <button id="btn-cube-add-pane" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;">+ Panel</button>
+                    <button id="btn-cube-sync" class="tool-btn" style="flex:1; justify-content:center; border:1px solid #ddd;" title="Copy view of panel 1 to all panels">Sync view</button>
+                </div>
+                <button id="btn-cube-fit" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Center view</button>
+            </div>
+        </details>
 
-        <label style="font-size:12px; font-weight:600;">Representation</label>
-        <div style="display:flex; gap:6px;">
-        <button class="tool-btn active" data-cube-repr="ballstick" style="flex:1;">Ball&amp;Stick</button>
-        <button class="tool-btn" data-cube-repr="wire" style="flex:1;">Wire</button>
-        </div>
+        <details open>
+            <summary style="font-weight:600; cursor:pointer;">Atoms</summary>
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px;">
+                <div style="display:flex; gap:6px;">
+                    <button class="tool-btn active" data-cube-repr="ballstick" style="flex:1;">Ball&amp;Stick</button>
+                    <button class="tool-btn" data-cube-repr="wire" style="flex:1;">Wire</button>
+                </div>
+                <label style="cursor:pointer;"><input type="checkbox" id="cube-show-h" checked> Show hydrogens</label>
+                <input type="text" id="cube-h-keep" placeholder="Keep H indices, e.g. 12,15-17"
+                    style="padding:6px; border:1px solid #ccc; border-radius:6px;">
+                <label style="cursor:pointer;"><input type="checkbox" id="cube-show-label"> Show labels</label>
+                <div style="color:#888;">Tip: click an atom to style or hide it individually.</div>
+            </div>
+        </details>
 
-        <label style="font-size:12px; cursor:pointer;">
-        <input type="checkbox" id="cube-show-h" checked> Show H
-        </label>
+        <details open>
+            <summary style="font-weight:600; cursor:pointer;">Isosurface</summary>
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px;">
+                <label style="font-weight:600;">Isovalue ± (0.0001 – 1.0)</label>
+                <input type="number" id="cube-iso-num" min="0.0001" max="1" step="0.001" value="0.02"
+                    style="padding:6px; border:1px solid #ccc; border-radius:6px;">
+                <label style="font-weight:600;">Colors (+ / −)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="color" id="cube-col-plus"  value="#3b82f6">
+                    <input type="color" id="cube-col-minus" value="#ef4444">
+                </div>
+            </div>
+        </details>
 
-        <label style="font-size:12px; cursor:pointer;">
-        <input type="checkbox" id="cube-show-label"> Show labels
-        </label>
-
-        <label style="font-size:12px; font-weight:600;">Isovalue ± (0.0001 – 1.0)</label>
-        <div style="display:flex; gap:8px; align-items:center;">
-            <input type="number" id="cube-iso-num" min="0.0001" max="1" step="0.001" value="0.02"
-                style="flex:1; padding:6px; border:1px solid #ccc; border-radius:6px;">
-        </div>
- 	
-	<label style="font-size:12px; font-weight:600;">Presentation preset (JSON)</label>
-    	<input type="file" id="cube-preset-input" accept=".json,application/json">
- 	<button id="btn-cube-preset-clear" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Remove preset</button>
-
-        <label style="font-size:12px; font-weight:600;">Colors of volume data (+ / −)</label>
-        <div style="display:flex; gap:10px; align-items:center;">
-        <input type="color" id="cube-col-plus"  value="#3b82f6">
-        <input type="color" id="cube-col-minus" value="#ef4444">
-        </div>
-
-        <label style="font-size:12px; cursor:pointer;">
-            <input type="checkbox" id="cube-lock-view" checked> Fix of orientation
-        </label>
-        <button id="btn-cube-fit" class="tool-btn" style="justify-content:center; border:1px solid #ddd;">Centering view</button>
-        
-        <button id="btn-cube-to-canvas" class="btn-secondary" style="justify-content:center;">Project on canvas</button>
-
-        <label style="font-size:12px; font-weight:600;">Export image</label>
-        <div style="display:flex; gap:8px; align-items:center;">
-        <select id="cube-export-scale" style="flex:1; padding:6px; border-radius:6px;">
-            <option value="2">2×</option>
-            <option value="4" selected>4×</option>
-        </select>
-        <button id="btn-cube-export" class="btn-primary" style="flex:1; margin:0;">PNG</button>
-        </div>
+        <details>
+            <summary style="font-weight:600; cursor:pointer;">Export & transfer</summary>
+            <div style="display:flex; flex-direction:column; gap:8px; padding-top:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="cube-export-scale" style="flex:1; padding:6px; border-radius:6px;">
+                        <option value="2">2×</option>
+                        <option value="4" selected>4×</option>
+                    </select>
+                    <button id="btn-cube-export" class="btn-primary" style="flex:1; margin:0;">PNG</button>
+                </div>
+                <button id="btn-cube-to-canvas" class="btn-secondary" style="justify-content:center;">Project on canvas</button>
+            </div>
+        </details>
 
         <button id="btn-cube-close" class="btn-secondary" style="margin-top:auto;">Close</button>
     </div>
@@ -529,6 +547,30 @@
         <div id="moldata-detail" style="flex:1; min-width:0; padding:16px; overflow:auto;">
             <div style="color:#999; font-size:13px;">Drag and drop data onto molecule.</div>
         </div>
+    </div>
+
+    <div id="canvas-context-menu" class="glass-panel"
+     style="display:none; position:fixed; z-index:5000; padding:4px; min-width:190px; flex-direction:column;"></div>
+
+    <div id="tpl-save-dialog" class="modal glass-panel"
+        style="display:none; position:absolute; top:120px; left:300px; padding:18px; z-index:5001;">
+    <div style="font-weight:600; margin-bottom:8px;">Save selection as template</div>
+    <input id="tpl-save-name" type="text" placeholder="Name…" style="width:220px; padding:5px;">
+    <div style="margin-top:10px; display:flex; gap:6px;">
+        <button id="tpl-save-ok" class="btn-primary" style="flex:1;">Save</button>
+        <button id="tpl-save-cancel" class="btn-secondary" style="flex:1;">Cancel</button>
+    </div>
+    </div>
+
+    <div id="update-dialog" class="modal glass-panel"
+        style="display:none; position:absolute; top:100px; right:60px; padding:18px; width:340px; z-index:5001;">
+    <div style="font-weight:600; margin-bottom:8px;">Updates</div>
+    <div id="update-status" style="font-size:13px;">…</div>
+    <div style="margin-top:12px; display:flex; gap:6px;">
+        <button id="update-install" class="btn-primary" style="flex:1;">Install</button>
+        <button id="update-open-link" class="tool-btn" style="flex:1; justify-content:center;">Download page</button>
+        <button id="update-close" class="btn-secondary" style="flex:0 0 70px;">Close</button>
+    </div>
     </div>
 
     <script>

@@ -1,7 +1,8 @@
 // src/templates.ts
 
+export type TemplateAtom = { id: number; element: string; x: number; y: number; charge?: number; customLabel?: string };
 export type TemplateData = {
-    atoms: { id: number, element: string, x: number, y: number }[],
+    atoms: TemplateAtom[],
     bonds: { id1: number, id2: number, type: number }[]
 };
 

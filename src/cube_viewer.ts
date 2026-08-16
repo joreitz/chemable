@@ -172,6 +172,8 @@ export function initCubeViewer(render: () => void) {
     let repr: Repr = "ballstick";
     let showH = true;
     let showLabels = false;
+    let hKeep = new Set<number>();                                        
+    const userSel = new Map<number, AtomStyle & { hidden?: boolean }>();
     let preset: Preset | null = null;
     const prefs = loadPrefs();
 
@@ -245,10 +247,21 @@ export function initCubeViewer(render: () => void) {
         if (s.color) o.stick.color = s.color;
         return o;
     }
+    function hideHOn(v: any) {
+        if (showH) return;
+        const hs = v.selectedAtoms({ elem: "H" })
+                    .filter((a: any) => !hKeep.has(a.index + 1))
+                    .map((a: any) => a.index);
+        if (hs.length) v.setStyle({ index: hs }, {});
+    }
+    function applyUserSel(v: any) {
+        for (const [i, s] of userSel)
+            v.setStyle({ index: [i - 1] }, s.hidden ? {} : elemSpec(s));
+    }
     function applySelectionsOn(v: any) {
         if (!preset?.selections) return;
-        const atoms = v.selectedAtoms({});                       // Reihenfolge = Datei-/ORCA-Reihenfolge
-        console.log("[cube] selections, atoms:", atoms.length);  // trial: läuft's? Atomzahl plausibel?
+        const atoms = v.selectedAtoms({});                       
+        console.log("[cube] selections, atoms:", atoms.length); 
         for (const sel of preset.selections) {
             if (sel.index == null) continue;
             const { set, invert } = parseIndexSpec(String(sel.index));
@@ -293,6 +306,7 @@ export function initCubeViewer(render: () => void) {
         }
         styleModel(v.addModel(atomsToMolblock(atoms), "sdf"), preset?.default ?? {});
     }
+    
     function applyLabelsOn(v: any) {
         v.removeAllLabels();                          // Labels überleben 
         if (!showLabels) return;
@@ -315,7 +329,62 @@ export function initCubeViewer(render: () => void) {
             v.addIsosurface(vol, { isoval: -val, color: prefs.colorMinus, opacity: 0.85, smoothness }),
         ];
     }
-    
+    let atomPopup: HTMLDivElement | null = null;
+    function closeAtomPopup() { atomPopup?.remove(); atomPopup = null; }
+    function openAtomPopup(atom: any, ev: MouseEvent) {
+        closeAtomPopup();
+        const idx = (atom.index ?? 0) + 1;
+        const cur = userSel.get(idx) ?? {};
+        const box = document.createElement("div"); atomPopup = box;
+        const r = (dialog as HTMLElement).getBoundingClientRect();
+        box.style.cssText =
+            `position:absolute;left:${(ev?.clientX ?? r.left + 60) - r.left + 8}px;top:${(ev?.clientY ?? r.top + 60) - r.top + 8}px;` +
+            "z-index:30;background:#fff;border-radius:10px;padding:10px;box-shadow:0 8px 30px rgba(0,0,0,0.25);" +
+            "font-size:12px;display:flex;flex-direction:column;gap:6px;min-width:170px;";
+
+        const title = document.createElement("div");
+        title.style.cssText = "font-weight:600;display:flex;justify-content:space-between;align-items:center;";
+        title.textContent = `${atom.elem}${idx}`;
+        const x = document.createElement("button");
+        x.textContent = "×"; x.style.cssText = "border:none;background:none;cursor:pointer;font-size:14px;";
+        x.onclick = closeAtomPopup; title.appendChild(x);
+
+        const reprSel = document.createElement("select");
+        for (const [v, t] of [["", "Repr: default"], ["ballstick", "Ball & Stick"], ["wire", "Wire"]])
+            { const o = document.createElement("option"); o.value = v; o.textContent = t; reprSel.appendChild(o); }
+        reprSel.value = cur.repr ?? "";
+
+        const colRow = document.createElement("label");
+        colRow.style.cssText = "display:flex;gap:8px;align-items:center;cursor:pointer;";
+        const colOn = document.createElement("input"); colOn.type = "checkbox"; colOn.checked = !!cur.color;
+        const col = document.createElement("input"); col.type = "color"; col.value = cur.color ?? "#909090";
+        colRow.append(colOn, col, document.createTextNode("Custom color"));
+
+        const hideRow = document.createElement("label");
+        hideRow.style.cssText = "display:flex;gap:8px;align-items:center;cursor:pointer;";
+        const hide = document.createElement("input"); hide.type = "checkbox"; hide.checked = !!cur.hidden;
+        hideRow.append(hide, document.createTextNode("Hide atom"));
+
+        const reset = document.createElement("button");
+        reset.textContent = "Reset atom"; reset.className = "tool-btn";
+        reset.style.cssText = "justify-content:center;border:1px solid #ddd;";
+
+        function commit() {
+            const s: AtomStyle & { hidden?: boolean } = {};
+            if (reprSel.value) s.repr = reprSel.value as Repr;
+            if (colOn.checked) s.color = col.value;
+            if (hide.checked) s.hidden = true;
+            if (Object.keys(s).length) userSel.set(idx, s); else userSel.delete(idx);
+            allPanes(p => paneRedraw(p, true));
+        }
+        reprSel.onchange = commit;
+        col.oninput = () => { colOn.checked = true; commit(); };
+        colOn.onchange = commit; hide.onchange = commit;
+        reset.onclick = () => { userSel.delete(idx); allPanes(p => paneRedraw(p, true)); closeAtomPopup(); };
+
+        box.append(title, reprSel, colRow, hideRow, reset);
+        (dialog as HTMLElement).appendChild(box);
+    }
     function paneRedraw(p: Pane, keepView: boolean) {
         if (!p.viewer || !p.current) return;
         const keep = keepView ? p.viewer.getView() : null;
@@ -323,7 +392,8 @@ export function initCubeViewer(render: () => void) {
         p.viewer.setBackgroundColor(bg());
         materialize(p.current);
         buildModels(p.viewer, cubes[p.current]);     // Modelle + Styles (inkl. Layer)
-        applyLabelsOn(p.viewer);                     // einmal!
+        p.viewer.setClickable({}, true, (a: any, _v: any, ev: any) => openAtomPopup(a, ev));
+        applyLabelsOn(p.viewer);                     
         p.isoShapes = drawIsoOn(p.viewer, p.current, 5);
         if (keep) p.viewer.setView(keep); else p.viewer.zoomTo();
         p.viewer.render();  
@@ -378,7 +448,7 @@ export function initCubeViewer(render: () => void) {
         activePane = null;
         while (panes.length) { const p = panes.pop()!; try { p.viewer?.clear(); } catch {} p.root.remove(); }
         refreshRail();
-        // resetSession();  ← LÖSCHEN: rief sich selbst auf
+        userSel.clear(); closeAtomPopup();
     }
     async function ingest(files: File[]) {
         const cubeFiles = files.filter(f => /\.cube?$/i.test(f.name));
@@ -453,7 +523,7 @@ export function initCubeViewer(render: () => void) {
         ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:20;";
         const box = document.createElement("div");
         box.style.cssText = "background:#fff;border-radius:10px;padding:16px;min-width:240px;max-height:70%;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,0.3);";
-        box.innerHTML = "<div style='font-weight:600;margin-bottom:10px;'>Welche Panels exportieren?</div>";
+        box.innerHTML = "<div style='font-weight:600;margin-bottom:10px;'>Export which panels?</div>";        
         const checks: HTMLInputElement[] = [];
         panes.forEach((p, i) => {
             const row = document.createElement("label");
@@ -464,8 +534,8 @@ export function initCubeViewer(render: () => void) {
         });
         const btnRow = document.createElement("div");
         btnRow.style.cssText = "display:flex;gap:8px;margin-top:12px;";
-        const ok = document.createElement("button"); ok.textContent = "Exportieren"; ok.className = "btn-primary"; ok.style.flex = "1";
-        const cancel = document.createElement("button"); cancel.textContent = "Abbrechen"; cancel.className = "btn-secondary"; cancel.style.flex = "1";
+        const ok = document.createElement("button"); ok.textContent = "Export"; ok.className = "btn-primary"; ok.style.flex = "1";
+        const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.className = "btn-secondary"; cancel.style.flex = "1";
         btnRow.append(ok, cancel); box.appendChild(btnRow); ov.appendChild(box);
         (dialog || document.body).appendChild(ov);
         cancel.onclick = () => ov.remove();
@@ -515,6 +585,11 @@ export function initCubeViewer(render: () => void) {
     }));
     chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => paneRedraw(p, true)); });
     chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => paneRedraw(p, true)); });
+    const hKeepInput = document.getElementById("cube-h-keep") as HTMLInputElement;
+    hKeepInput?.addEventListener("change", () => {
+        hKeep = parseIndexSpec(hKeepInput.value).set;
+        allPanes(p => paneRedraw(p, true));
+    });
 
     let isoTimer: any = null;
     isoNum?.addEventListener("input", () => {
