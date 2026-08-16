@@ -183,6 +183,10 @@ export function initCubeViewer(render: () => void) {
     if (isoNum)    isoNum.value = String(prefs.iso);
 
     let rail: HTMLDivElement | null = null;
+    let railList: HTMLDivElement | null = null;
+    let railCollapsed = false;
+    let railToggle: HTMLButtonElement | null = null;
+    let hiddenBar: HTMLDivElement | null = null;
     if (grid) {
         grid.style.position = "relative";
         rail = document.createElement("div");
@@ -190,9 +194,31 @@ export function initCubeViewer(render: () => void) {
         rail.style.cssText =
             "position:absolute;left:8px;top:8px;bottom:8px;width:150px;z-index:5;padding:6px;" +
             "background:rgba(245,245,245,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);" +
-            "border:1px solid rgba(0,0,0,0.08);border-radius:8px;overflow-y:auto;display:none;";
+            "border:1px solid rgba(0,0,0,0.08);border-radius:8px;overflow:hidden;display:none;" +
+            "flex-direction:column;transition:width 0.12s ease;";
+        railToggle = document.createElement("button");
+        railToggle.style.cssText = "border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;align-self:flex-end;";
+        railToggle.title = "Collapse / expand";
+        railToggle.textContent = "«";
+        railToggle.addEventListener("click", () => {
+            railCollapsed = !railCollapsed;
+            railToggle!.textContent = railCollapsed ? "»" : "«";
+            rail!.style.width = railCollapsed ? "28px" : "150px";
+            railList!.style.display = railCollapsed ? "none" : "block";
+            layoutPanes();
+        });
+        railList = document.createElement("div");
+        railList.style.cssText = "flex:1;overflow-y:auto;";
+        rail.append(railToggle, railList);
         grid.appendChild(rail);
+        hiddenBar = document.createElement("div");
+        hiddenBar.style.cssText =
+            "position:absolute;right:8px;top:8px;z-index:6;display:none;gap:4px;flex-wrap:wrap;max-width:45%;" +
+            "padding:6px;background:rgba(245,245,245,0.72);backdrop-filter:blur(6px);" +
+            "border:1px solid rgba(0,0,0,0.08);border-radius:8px;font-size:11px;align-items:center;";
+        grid.appendChild(hiddenBar);
     }
+
     function setActivePane(p: Pane | null) {
         activePane = p;
         panes.forEach(x => x.root.style.outline = x === p ? "2px solid #3b82f6" : "none");
@@ -207,20 +233,21 @@ export function initCubeViewer(render: () => void) {
         refreshRail();
     }
     function refreshRail() {
-        if (!rail) return;
-        rail.innerHTML = "";
+        if (!rail || !railList) return;
+        railList.innerHTML = "";
         entryNames.forEach(name => {
             const on = activePane?.current === name;
             const item = document.createElement("button");
-            item.textContent = name;
+            item.textContent = name; item.title = name;
             item.style.cssText =
                 "display:block;width:100%;text-align:left;margin:2px 0;padding:6px 8px;border:none;border-radius:6px;" +
                 "font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" +
                 (on ? "background:#3b82f6;color:#fff;font-weight:600;" : "background:rgba(255,255,255,0.55);color:#222;");
             item.addEventListener("click", () => selectVolume(name));
-            rail!.appendChild(item);
+            railList!.appendChild(item);
         });
-        rail.style.display = entryNames.length ? "block" : "none";
+        rail.style.display = entryNames.length ? "flex" : "none";
+        layoutPanes();
     }
     function bg(): string { return preset?.background || "white"; }
     function materialize(name: string) {
@@ -276,7 +303,6 @@ export function initCubeViewer(render: () => void) {
         if (preset?.default) v.setStyle({}, elemSpec(preset.default));
         if (preset?.elements) for (const [el, s] of Object.entries(preset.elements)) v.setStyle({ elem: el }, elemSpec(s));
         applySelectionsOn(v);
-        if (!showH) v.setStyle({ elem: "H" }, {});
     }
     function styleModel(m: any, sel: AtomStyle, layerWins = false) {
         m.setStyle({}, elemSpec(sel));
@@ -285,26 +311,25 @@ export function initCubeViewer(render: () => void) {
                 const merged = layerWins ? { ...s, ...sel } : { ...sel, ...s };  // Overlay: Layer-Geometrie gewinnt, Element-Farbe bleibt
                 m.setStyle({ elem: el }, elemSpec(merged));
             }
-        if (!showH) m.setStyle({ elem: "H" }, {});
     }
     function buildModels(v: any, cubeText: string) {
         const layers = (preset?.selections ?? []).filter(s => s.layer && s.index);
         if (!layers.length) {
             v.addModel(cubeText, "cube");
             applyStyleOn(v);
-            return;
+        } else {
+            const atoms = cubeAtoms(cubeText);
+            for (const sel of layers) {
+                const { set, invert } = parseIndexSpec(String(sel.index));
+                const pick: typeof atoms = [];
+                atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) pick.push(a); });
+                if (!pick.length) continue;
+                styleModel(v.addModel(atomsToMolblock(pick), "sdf"), sel, true);
+            }
+            styleModel(v.addModel(atomsToMolblock(atoms), "sdf"), preset?.default ?? {});
         }
-        const atoms = cubeAtoms(cubeText);
-        const claimed = new Set<number>();
-        for (const sel of layers) {
-            const { set, invert } = parseIndexSpec(String(sel.index));
-            const pick: typeof atoms = [];
-            atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) { pick.push(a); claimed.add(i); } });
-            console.log("[cube] layer", sel.index, "-> picked", pick.length);
-            if (!pick.length) continue;
-            styleModel(v.addModel(atomsToMolblock(pick), "sdf"), sel, true);   // "sdf" = Molblock-Parser
-        }
-        styleModel(v.addModel(atomsToMolblock(atoms), "sdf"), preset?.default ?? {});
+        hideHOn(v);        
+        applyUserSel(v);  
     }
     
     function applyLabelsOn(v: any) {
@@ -385,18 +410,56 @@ export function initCubeViewer(render: () => void) {
         box.append(title, reprSel, colRow, hideRow, reset);
         (dialog as HTMLElement).appendChild(box);
     }
+    function atomOnlySel(v: any): any {
+        const els = Array.from(new Set(v.selectedAtoms({}).map((a: any) => a.elem)));
+        return els.length ? { elem: els } : {};
+    }
+    function refreshHiddenBar() {
+        if (!hiddenBar) return;
+        const hidden = [...userSel.entries()].filter(([, s]) => s.hidden).map(([i]) => i).sort((a, b) => a - b);
+        hiddenBar.innerHTML = "";
+        if (!hidden.length) { hiddenBar.style.display = "none"; return; }
+
+        const cap = document.createElement("span");
+        cap.textContent = "Hidden:"; cap.style.cssText = "font-weight:600;margin-right:2px;";
+        hiddenBar.appendChild(cap);
+
+        hidden.forEach(idx => {
+            const b = document.createElement("button");
+            b.textContent = `#${idx} ×`;
+            b.title = "Show this atom again";
+            b.style.cssText = "border:none;border-radius:5px;padding:3px 6px;cursor:pointer;background:#3b82f6;color:#fff;";
+            b.onclick = () => { userSel.delete(idx); allPanes(p => paneRedraw(p, true)); };
+            hiddenBar!.appendChild(b);
+        });
+
+        const all = document.createElement("button");
+        all.textContent = "Show all";
+        all.style.cssText = "border:1px solid #ccc;border-radius:5px;padding:3px 6px;cursor:pointer;background:#fff;margin-left:4px;";
+        all.onclick = () => {
+            [...userSel.entries()].forEach(([i, s]) => { if (s.hidden) userSel.delete(i); });
+            allPanes(p => paneRedraw(p, true));
+        };
+        hiddenBar.appendChild(all);
+    }
     function paneRedraw(p: Pane, keepView: boolean) {
         if (!p.viewer || !p.current) return;
         const keep = keepView ? p.viewer.getView() : null;
         p.viewer.removeAllModels(); p.viewer.removeAllShapes(); p.isoShapes = [];
         p.viewer.setBackgroundColor(bg());
         materialize(p.current);
-        buildModels(p.viewer, cubes[p.current]);     // Modelle + Styles (inkl. Layer)
+        buildModels(p.viewer, cubes[p.current]);     
         p.viewer.setClickable({}, true, (a: any, _v: any, ev: any) => openAtomPopup(a, ev));
         applyLabelsOn(p.viewer);                     
         p.isoShapes = drawIsoOn(p.viewer, p.current, 5);
-        if (keep) p.viewer.setView(keep); else p.viewer.zoomTo();
-        p.viewer.render();  
+        p.viewer.zoomTo(atomOnlySel(p.viewer));      
+        if (keep) {
+            const v = p.viewer.getView();            
+            v[4] = keep[4]; v[5] = keep[5]; v[6] = keep[6]; v[7] = keep[7];   
+            p.viewer.setView(v);
+        }
+        p.viewer.render();
+        refreshHiddenBar();
     }
     function paneIso(p: Pane, smoothness: number) {
         if (!p.viewer || !p.current) return;
@@ -412,9 +475,21 @@ export function initCubeViewer(render: () => void) {
         entryNames.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
         if (value) sel.value = value;
     }
+    function layoutPanes() {
+        if (!grid) return;
+        const n = panes.length;
+        grid.style.display = "grid";
+        grid.style.gap = "8px";
+        grid.style.gridTemplateColumns = n <= 1 ? "1fr" : "1fr 1fr";
+        grid.style.gridTemplateRows    = n <= 2 ? "1fr" : "1fr 1fr";
+        const railW = (rail && rail.style.display !== "none") ? (railCollapsed ? 44 : 166) : 8;
+        grid.style.padding = `8px 8px 8px ${railW}px`;
+        requestAnimationFrame(resizeAll);
+    }
     function addPane(moName?: string): Pane {
         const root = document.createElement("div");
-        root.style.cssText = "display:flex;flex-direction:column;min-width:220px;min-height:200px;border:1px solid rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;flex:1;";
+        root.style.cssText = "display:flex;flex-direction:column;min-width:0;min-height:0;" +
+                             "border:1px solid rgba(0,0,0,0.1);border-radius:8px;overflow:hidden;";
         const bar = document.createElement("div");
         bar.style.cssText = "display:flex;gap:6px;align-items:center;padding:4px 6px;background:rgba(0,0,0,0.03);";
         const label = document.createElement("span");
@@ -434,10 +509,11 @@ export function initCubeViewer(render: () => void) {
             if (panes.length <= 1) return;
             panes.splice(panes.indexOf(p), 1); root.remove();
             if (activePane === p) setActivePane(panes[0] ?? null);
-            resizeAll();
+            layoutPanes();
         });
         new ResizeObserver(() => p.viewer?.resize()).observe(body);
         panes.push(p);
+        layoutPanes();
         setActivePane(p);
         if (p.current) paneRedraw(p, false);
         requestAnimationFrame(() => p.viewer?.resize());
@@ -448,7 +524,7 @@ export function initCubeViewer(render: () => void) {
         activePane = null;
         while (panes.length) { const p = panes.pop()!; try { p.viewer?.clear(); } catch {} p.root.remove(); }
         refreshRail();
-        userSel.clear(); closeAtomPopup();
+        userSel.clear(); closeAtomPopup(); refreshHiddenBar();
     }
     async function ingest(files: File[]) {
         const cubeFiles = files.filter(f => /\.cube?$/i.test(f.name));
@@ -556,10 +632,20 @@ export function initCubeViewer(render: () => void) {
 
     // --- Events ---
     fileInput?.addEventListener("change", () => { if (fileInput.files) ingest(Array.from(fileInput.files)); });
-    document.getElementById("btn-cube-add-pane")?.addEventListener("click", () => { if (entryNames.length) addPane(); });
+    document.getElementById("btn-cube-add-pane")?.addEventListener("click", () => {
+        if (!entryNames.length) return;
+        if (panes.length >= 4) { console.warn("[cube] max. 4 Panes"); return; }
+        addPane();
+    });
     document.getElementById("btn-cube-sync")?.addEventListener("click", () => {
-        const v = panes[0]?.viewer?.getView();
-        if (v) panes.slice(1).forEach(p => { p.viewer.setView(v); p.viewer.render(); });
+        const src = panes[0]?.viewer?.getView();
+        if (!src) return;
+        panes.slice(1).forEach(p => {
+            const v = p.viewer.getView();
+            v[3] = src[3];                                                   
+            v[4] = src[4]; v[5] = src[5]; v[6] = src[6]; v[7] = src[7];       
+            p.viewer.setView(v); p.viewer.render();
+        });
     });
     document.getElementById("btn-cube-to-canvas")?.addEventListener("click", toCanvas);
 
@@ -590,6 +676,13 @@ export function initCubeViewer(render: () => void) {
         hKeep = parseIndexSpec(hKeepInput.value).set;
         allPanes(p => paneRedraw(p, true));
     });
+    let hKeepTimer: any = null;
+    const applyHKeep = () => {
+        hKeep = parseIndexSpec(hKeepInput.value).set;
+        allPanes(p => paneRedraw(p, true));
+    };
+    hKeepInput?.addEventListener("input", () => { clearTimeout(hKeepTimer); hKeepTimer = setTimeout(applyHKeep, 250); });
+    hKeepInput?.addEventListener("change", applyHKeep);
 
     let isoTimer: any = null;
     isoNum?.addEventListener("input", () => {
