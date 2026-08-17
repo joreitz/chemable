@@ -2,16 +2,13 @@
 import { state } from "../state";
 import { Atom, Bond } from "../types";
 
-export function applySdfToCanvas(sdfString: string, render: () => void, merge: boolean = false) {
+export function applySdfToCanvas(sdfString: string, render: () => void, merge: boolean = false, keepHydrogens: boolean = false) {
     const oldAtoms = merge ? [...state.getAtoms()] : [];
     const oldBonds = merge ? [...state.getBonds()] : [];
 
     try {
-        // OHNE .trim() am Anfang, damit absichtliche Leerzeilen im Header nicht kaputtgehen!
         const lines = sdfString.split(/\r?\n/);
         
-        // --- BULLETPROOF FIX ---
-        // Wir suchen die Zeile mit der Atomanzahl dynamisch (sie endet fast immer auf V2000)
         let countsLineIdx = 3; // Standard-Annahme
         for (let i = 0; i < Math.min(10, lines.length); i++) {
             if (lines[i].includes("V2000") || lines[i].includes("V3000")) {
@@ -34,7 +31,6 @@ export function applySdfToCanvas(sdfString: string, render: () => void, merge: b
         let tempBonds: any[] = [];
         const scale = 40; 
 
-        // Die Atome starten immer exakt EINE Zeile unter der Counts-Line
         let offset = countsLineIdx + 1; 
         let sumX = 0, sumY = 0, sumZ = 0;
 
@@ -80,9 +76,11 @@ export function applySdfToCanvas(sdfString: string, render: () => void, merge: b
 
         for (const a of tempAtoms) {
             if (a.element.toUpperCase() === 'H') continue; 
+            if (!keepHydrogens && a.element.toUpperCase() === 'H') continue;
             
             const newId = state.getNextId(); 
             idMap.set(a.id, newId);
+           
 
             const locX = (a.x - avgX) * scale;
             const locY = (a.y - avgY) * scale;

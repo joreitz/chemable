@@ -80,6 +80,14 @@
             color: var(--primary) !important;
             border-color: var(--primary) !important;
         }
+        #toolbar { gap: 4px; padding: 6px; box-sizing: border-box; }
+        #toolbar, #menubar { max-height: 100vh; }
+        #menubar.dock-bottom .dropdown-content { top: auto; bottom: 100%; margin: 0; }
+        #menubar.dock-right  .dropdown-content { right: 0; left: auto; }
+        #menubar.dock-left,  #menubar.dock-right { padding: 10px 8px; gap: 6px; }
+        #menubar.dock-left .dropdown, #menubar.dock-right .dropdown { width: 100%; }
+        #menubar.dock-left .menu-btn, #menubar.dock-right .menu-btn { width: 100%; }
+        #toolbar, #menubar { max-height: 100vh; box-sizing: border-box; }
         /* --- BUTTONS --- */
         button {
             background: none;

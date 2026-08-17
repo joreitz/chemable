@@ -14,6 +14,7 @@ import { drawScene } from "./draw";
 import { uiState } from "./core/ui-state";
 import { init3DViewer } from "./viewer3d";
 import { initCubeViewer } from "./cube_viewer";
+import { makeDockable } from "./ui/dock";
 
 // --- MODULE IMPORTS ---
 import { initToolbar } from "./ui/toolbar";
@@ -154,6 +155,10 @@ initPSEMenu();
 initStyleMenu(render);
 initCubeViewer(render);
 initShapeMenu(render);
+const menubarEl = document.getElementById("menubar");
+if (menubarEl) makeDockable(menubarEl, { key: "menubar", zones: ["top", "bottom", "left", "right"], scroll: false });
+const toolbarEl = document.getElementById("toolbar");
+if (toolbarEl) makeDockable(toolbarEl, { key: "toolbar", zones: ["left", "right"] });
 document.getElementById("btn-shapes")?.addEventListener("click", () => {
     const d = document.getElementById("shape-dialog"); if (d) d.style.display = "block";
 });

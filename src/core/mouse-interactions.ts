@@ -58,7 +58,6 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) - uiState.panX;
             const y = (e.clientY - rect.top) - uiState.panY;
-            if (graphicsMouseDown(x, y, e, render)) return;
 
             const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
             if (clickedAtom) {
@@ -140,7 +139,9 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         const y = (e.clientY - rect.top) - uiState.panY;
         const atoms = state.getAtoms();
         const bonds = state.getBonds();
-    
+        
+        if (graphicsMouseDown(x, y, e, render)) return;
+
         if (e.button === 2) {
             const selectedIDs = state.getSelectedAtomIds();
             if (selectedIDs.size > 0) {

@@ -642,7 +642,7 @@ export function initCubeViewer(render: () => void) {
             const atoms = cubeAtoms(cubes[p.current]);
             const keep = atoms.filter((a, i) => isVisibleAtom(i + 1, a.s));
             if (!keep.length) { console.warn("[cube] nichts Sichtbares zu übertragen"); return; }
-            applySdfToCanvas(atomsToMolblock(keep), render, false);
+            applySdfToCanvas(atomsToMolblock(keep), render, false, true);
             if (!state.is3DMode) state.set3DMode(true);
             render();
             if (dialog) dialog.style.display = "none";
