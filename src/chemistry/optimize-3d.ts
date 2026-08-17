@@ -75,9 +75,8 @@ export function applySdfToCanvas(sdfString: string, render: () => void, merge: b
         }
 
         for (const a of tempAtoms) {
-            if (a.element.toUpperCase() === 'H') continue; 
             if (!keepHydrogens && a.element.toUpperCase() === 'H') continue;
-            
+
             const newId = state.getNextId(); 
             idMap.set(a.id, newId);
            

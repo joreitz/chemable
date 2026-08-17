@@ -691,10 +691,6 @@ export function initCubeViewer(render: () => void) {
     chkH?.addEventListener("change", () => { showH = chkH.checked; allPanes(p => paneRedraw(p, true)); });
     chkLabel?.addEventListener("change", () => { showLabels = chkLabel.checked; allPanes(p => paneRedraw(p, true)); });
     const hKeepInput = document.getElementById("cube-h-keep") as HTMLInputElement;
-    hKeepInput?.addEventListener("change", () => {
-        hKeep = parseIndexSpec(hKeepInput.value).set;
-        allPanes(p => paneRedraw(p, true));
-    });
     let hKeepTimer: any = null;
     const applyHKeep = () => {
         hKeep = parseIndexSpec(hKeepInput.value).set;
@@ -721,7 +717,8 @@ export function initCubeViewer(render: () => void) {
     colPlus?.addEventListener("input",  () => { prefs.colorPlus  = colPlus.value;  savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
     colMinus?.addEventListener("input", () => { prefs.colorMinus = colMinus.value; savePrefs(prefs); allPanes(p => paneIso(p, 5)); });
 
-    document.getElementById("btn-cube-fit")?.addEventListener("click", () => allPanes(p => { p.viewer.zoomTo(); p.viewer.render(); }));
+    document.getElementById("btn-cube-fit")?.addEventListener("click", () =>
+        allPanes(p => { p.viewer.zoomTo(atomOnlySel(p.viewer)); p.viewer.render(); }));
     document.getElementById("btn-cube-export")?.addEventListener("click", () => {
         const sel = document.getElementById("cube-export-scale") as HTMLSelectElement;
         const scale = parseInt(sel?.value || "4", 10);
