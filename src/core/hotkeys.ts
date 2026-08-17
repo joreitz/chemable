@@ -1,4 +1,3 @@
-// src/core/hotkeys.ts
 import { uiState } from "./ui-state";
 import { state } from "../state";
 import { setMode } from "../ui/toolbar";
@@ -6,6 +5,7 @@ import { copySelection, pasteSelection, cutSelection } from "./clipboard";
 import { pendingTemplate, cancelTemplate } from "../chemistry/template-manager";
 import { findAtomNearPosition } from "../geometry";
 import { openTextEditor } from "../ui/text-editor";
+import { deleteSelectedGraphics } from "../graphics/graphics-tool";
 
 let hotkeys = JSON.parse(localStorage.getItem('chemable-hotkeys') || '{"copy":"c","paste":"v","cut":"x","undo":"z","text":"t","draw":"d","move":"m","erase":"e","select":"l","arrow":"a"}');
 
@@ -21,6 +21,10 @@ export function initHotkeys(canvas: HTMLCanvasElement, render: () => void, perfo
         if (key === 'escape' && pendingTemplate) {
             cancelTemplate(render);
             return;
+        }
+
+        if (key === "delete" || key === "backspace") {
+            if (deleteSelectedGraphics(render)) { event.preventDefault(); return; }
         }
 
         if (isCtrl && key === hotkeys.copy) { copySelection(); event.preventDefault(); }

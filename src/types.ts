@@ -30,6 +30,20 @@ export interface Bond {
 export interface EditorState {
     atoms: Atom[];
     bonds: Bond[];
+    graphics: Graphic[];
     nextId: number;
     currentElement: string;
+}
+
+export type GraphicKind = string;
+
+export interface Graphic {
+    id: number;
+    kind: GraphicKind;
+    x1: number; y1: number;
+    x2: number; y2: number;
+    bow?: number;        
+    color?: string;
+    lineWidth?: number;
+    radius?: number;     
 }

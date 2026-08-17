@@ -6,6 +6,9 @@ import { parseChemicalRichText, isBondOnRightSide } from "./draw";
 import { uiState } from "./core/ui-state";
 import { jsPDF } from "jspdf";
 import { drawScene } from "./draw";
+import { state } from "./state";
+import { primsToSVG, SHADOW_DEF } from "./graphics/primitives";
+import { buildPrims } from "./graphics/shapes";
 
 function buildSvgRichText(text: string, baseFontSize: number): string {
     const normalizeMap: Record<string, string> = {
@@ -235,7 +238,11 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             svg += additions;
         }
     });
-
+    if (!isSelection && state.getGraphics().length) {
+        svg += SHADOW_DEF;
+        for (const g of state.getGraphics())
+            svg += primsToSVG(buildPrims(g), g.color || uiState.globalColor, g.lineWidth ?? uiState.globalLineWidth);
+    }
     const dataToEmbed = JSON.stringify({ atoms: exportAtoms, bonds: exportBonds });
     svg += `  <desc id="chemable-data">${dataToEmbed}</desc>\n`;
     svg += `</svg>`;

@@ -274,16 +274,21 @@ export function initCubeViewer(render: () => void) {
         if (s.color) o.stick.color = s.color;
         return o;
     }
-    function hideHOn(v: any) {
-        if (showH) return;
-        const hs = v.selectedAtoms({ elem: "H" })
-                    .filter((a: any) => !hKeep.has(a.index + 1))
-                    .map((a: any) => a.index);
-        if (hs.length) v.setStyle({ index: hs }, {});
+    function tagModel(m: any, g: number[]) {
+        m.selectedAtoms({}).forEach((a: any, i: number) => { a.__gidx = g[i]; });
     }
-    function applyUserSel(v: any) {
-        for (const [i, s] of userSel)
-            v.setStyle({ index: [i - 1] }, s.hidden ? {} : elemSpec(s));
+    function hideHOnModel(m: any, g: number[]) {
+        if (showH) return;
+        const hs = m.selectedAtoms({ elem: "H" })
+                    .filter((a: any) => !hKeep.has(g[a.index]))
+                    .map((a: any) => a.index);
+        if (hs.length) m.setStyle({ index: hs }, {});
+    }
+    function applyUserSelModel(m: any, g: number[]) {
+        for (const [gi, s] of userSel) {
+            const loc = g.indexOf(gi);
+            if (loc >= 0) m.setStyle({ index: [loc] }, s.hidden ? {} : elemSpec(s));
+        }
     }
     function applySelectionsOn(v: any) {
         if (!preset?.selections) return;
@@ -314,32 +319,38 @@ export function initCubeViewer(render: () => void) {
     }
     function buildModels(v: any, cubeText: string) {
         const layers = (preset?.selections ?? []).filter(s => s.layer && s.index);
+        const atoms = cubeAtoms(cubeText);
+        const finish = (m: any, g: number[]) => { tagModel(m, g); hideHOnModel(m, g); applyUserSelModel(m, g); };
+
         if (!layers.length) {
-            v.addModel(cubeText, "cube");
+            const m = v.addModel(cubeText, "cube");
             applyStyleOn(v);
-        } else {
-            const atoms = cubeAtoms(cubeText);
-            for (const sel of layers) {
-                const { set, invert } = parseIndexSpec(String(sel.index));
-                const pick: typeof atoms = [];
-                atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) pick.push(a); });
-                if (!pick.length) continue;
-                styleModel(v.addModel(atomsToMolblock(pick), "sdf"), sel, true);
-            }
-            styleModel(v.addModel(atomsToMolblock(atoms), "sdf"), preset?.default ?? {});
+            finish(m, atoms.map((_, i) => i + 1));
+            return;
         }
-        hideHOn(v);        
-        applyUserSel(v);  
+        for (const sel of layers) {
+            const { set, invert } = parseIndexSpec(String(sel.index));
+            const pick: typeof atoms = [], g: number[] = [];
+            atoms.forEach((a, i) => { if (set.has(i + 1) !== invert) { pick.push(a); g.push(i + 1); } });
+            if (!pick.length) continue;
+            const m = v.addModel(atomsToMolblock(pick), "sdf");
+            styleModel(m, sel, true);
+            finish(m, g);
+        }
+        const full = v.addModel(atomsToMolblock(atoms), "sdf");
+        styleModel(full, preset?.default ?? {});
+        finish(full, atoms.map((_, i) => i + 1));
     }
     
     function applyLabelsOn(v: any) {
-        v.removeAllLabels();                          // Labels überleben 
+        v.removeAllLabels();
         if (!showLabels) return;
-        const atoms = v.getModel((v.getNumModels?.() ?? 1) - 1)?.selectedAtoms({}) ?? v.selectedAtoms({});          // {} = alle Atome
-        console.log("[cube] labels:", atoms.length);  // trial:
+        const atoms = v.getModel((v.getNumModels?.() ?? 1) - 1)?.selectedAtoms({}) ?? v.selectedAtoms({});
         atoms.forEach((a: any, i: number) => {
-            if (!showH && a.elem === "H") return;
-            v.addLabel(`${a.elem}${(a.index ?? i) + 1}`, {
+            const gi = a.__gidx ?? ((a.index ?? i) + 1);
+            if (!showH && a.elem === "H" && !hKeep.has(gi)) return;
+            if (userSel.get(gi)?.hidden) return;
+            v.addLabel(`${a.elem}${gi}`, {
                 position: { x: a.x, y: a.y, z: a.z },
                 fontSize: 11, fontColor: "black",
                 backgroundColor: "white", backgroundOpacity: 0.55, inFront: true,
@@ -358,7 +369,7 @@ export function initCubeViewer(render: () => void) {
     function closeAtomPopup() { atomPopup?.remove(); atomPopup = null; }
     function openAtomPopup(atom: any, ev: MouseEvent) {
         closeAtomPopup();
-        const idx = (atom.index ?? 0) + 1;
+        const idx = atom.__gidx ?? ((atom.index ?? 0) + 1);
         const cur = userSel.get(idx) ?? {};
         const box = document.createElement("div"); atomPopup = box;
         const r = (dialog as HTMLElement).getBoundingClientRect();
@@ -618,12 +629,20 @@ export function initCubeViewer(render: () => void) {
         ok.onclick = () => { panes.forEach((p, i) => { if (checks[i].checked) exportPanePNG(p, scale); }); ov.remove(); };
     }
 
+    function isVisibleAtom(gi: number, elem: string): boolean {
+        if (userSel.get(gi)?.hidden) return false;
+        if (!showH && elem === "H" && !hKeep.has(gi)) return false;
+        return true;
+    }
     function toCanvas() {
-        const p = panes[0];
+        const p = activePane ?? panes[0];
         if (!p?.current) return;
         materialize(p.current);
         try {
-            applySdfToCanvas(cubeToMolblock(cubes[p.current]), render, false);
+            const atoms = cubeAtoms(cubes[p.current]);
+            const keep = atoms.filter((a, i) => isVisibleAtom(i + 1, a.s));
+            if (!keep.length) { console.warn("[cube] nichts Sichtbares zu übertragen"); return; }
+            applySdfToCanvas(atomsToMolblock(keep), render, false);
             if (!state.is3DMode) state.set3DMode(true);
             render();
             if (dialog) dialog.style.display = "none";

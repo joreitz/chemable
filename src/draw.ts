@@ -1,6 +1,9 @@
 import { Atom, Bond } from "./types";
 import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
+import { Graphic } from "./types";
+import { paintPrims, paintHandles } from "./graphics/primitives";
+import { buildPrims } from "./graphics/shapes";
 
 export function parseChemicalRichText(text: string): string {
     const subMap: any = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
@@ -51,7 +54,10 @@ export interface DrawOptions {
     globalColor: string;        
     showImplicitHydrogens: boolean;
     globalLineWidth?: number;
-    atomPadding?: number;   
+    atomPadding?: number;
+    graphics?: Graphic[];
+    selectedGraphicIds?: Set<number>;
+    graphicPreview?: Graphic | null;   
 }
 
 export function drawScene(
@@ -308,9 +314,6 @@ export function drawScene(
                 ctx.fill();
             }
 
-            // HINWEIS: Die alte weiße Hintergrund-Ellipse wurde hier komplett entfernt, 
-            // da die Bindungen nun präzise vor den Buchstaben abreißen (Bond Clipping)!
-
             if (!data.isHidden) {
                 ctx.fillStyle = atom.color || options.globalColor;
                 ctx.fillText(data.label, data.drawX, atom.y);
@@ -379,6 +382,16 @@ export function drawScene(
         ctx.setLineDash([5, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
+    }
+
+    if (options.graphics) for (const g of options.graphics) {
+        paintPrims(ctx, buildPrims(g), g.color || options.globalColor, g.lineWidth ?? (options.globalLineWidth ?? 2));
+        if (options.selectedGraphicIds?.has(g.id)) paintHandles(ctx, g);
+    }
+    if (options.graphicPreview) {
+        ctx.save(); ctx.globalAlpha = 0.55;
+        paintPrims(ctx, buildPrims(options.graphicPreview), "#007bff", options.graphicPreview.lineWidth ?? 2);
+        ctx.restore();
     }
 
     // --- SELEKTION ---

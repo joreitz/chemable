@@ -4,6 +4,7 @@ import { findAtomNearPosition, getBondAtCoords, centerOfPoints, rotatePoint, ang
 import { setMode } from "../ui/toolbar";
 import { calculateNewAtomPosition } from "../chemistry";
 import { MOLECULE_TEMPLATES, TemplateData } from "../templates";
+import { graphicsMouseDown, graphicsMouseMove, graphicsMouseUp } from "../graphics/graphics-tool";
 import { Atom, Bond } from "../types";
 // src/core/mouse-interactions.ts  — Import-Zeile 8 ersetzen
 import { pendingTemplate, templatePhase, cancelTemplate, templateBack,
@@ -39,7 +40,14 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             canvas.style.cursor = "grabbing";
             return; 
         }
-    
+        
+        if (e.button === 2 && e.shiftKey) {
+            isRotating3D = true;
+            lastMouseX = e.clientX; lastMouseY = e.clientY;
+            canvas.style.cursor = "grabbing";
+            return;
+        }
+
         if (e.button === 2 && pendingTemplate) {
             templateBack(render);          
             return; 
@@ -50,7 +58,8 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) - uiState.panX;
             const y = (e.clientY - rect.top) - uiState.panY;
-            
+            if (graphicsMouseDown(x, y, e, render)) return;
+
             const clickedAtom = findAtomNearPosition(x, y, atoms, 20);
             if (clickedAtom) {
                 if (!alignSelection.some(a => a.id === clickedAtom.id)) {
@@ -211,7 +220,8 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
         const rect = canvas.getBoundingClientRect();
         uiState.currentMouseX = (e.clientX - rect.left) - uiState.panX;
         uiState.currentMouseY = (e.clientY - rect.top) - uiState.panY;
-        
+        if (graphicsMouseMove(uiState.currentMouseX, uiState.currentMouseY, e, render)) return;
+
         if (isRotating3D) {
             const dx = e.clientX - lastMouseX;
             const dy = e.clientY - lastMouseY;
@@ -363,18 +373,18 @@ export function initMouseHandler(canvas: HTMLCanvasElement, render: () => void) 
             return;
         }
         
-        if (isRotating) {
-            isRotating = false;
-            initialAtomPosition.clear();
-            if (!rotationSaved) openContextMenu(e.clientX, e.clientY);   // Klick ohne Drag = Menü
-            rotationSaved = false;
+        if (isRotating3D) {
+            isRotating3D = false;
+            setMode(uiState.editMode);        
+            state.saveState();
             return;
         }
 
         const rect = canvas.getBoundingClientRect();
         let x = e.clientX - rect.left - uiState.panX;
         let y = e.clientY - rect.top - uiState.panY;
-        
+        if (graphicsMouseUp(x, y, e, render)) return;
+
         if (isRotating3D) {
             isRotating3D = false;
             state.saveState(); 

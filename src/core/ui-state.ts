@@ -1,4 +1,4 @@
-export type EditMode = "draw" | "move" | "erase" | "select" | "text" | "arrow" | "charge_plus" | "charge_minus" | "radical" | "rotate_3d" | "align_3d" ;
+export type EditMode = "draw" | "move" | "erase" | "select" | "text" | "arrow" | "shape" | "charge_plus" | "charge_minus" | "radical" | "rotate_3d" | "align_3d";
 const STYLE_KEY = "chemable-style";
 const STYLE_DEFAULTS = {
     currentFontSize: 27, currentBondLength: 60, globalLineWidth: 2,

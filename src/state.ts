@@ -1,4 +1,4 @@
-import { Atom, Bond, EditorState } from "./types";
+import { Atom, Bond, Graphic, EditorState } from "./types";
 
 // --- PRIVATE DATEN (Single Source of Truth) ---
 let atoms: Atom[] = [];
@@ -8,6 +8,8 @@ let currentElement = "C";
 let selectedAtomIDs = new Set<number>();
 let historyState: EditorState[] = [];
 let is3DMode = false;
+let graphics: Graphic[] = [];
+let selectedGraphicIDs = new Set<number>();
 
 // --- PUBLIC INTERFACE ---
 export const state = {
@@ -32,6 +34,18 @@ export const state = {
     addAtom: (atom: Atom) => { atoms.push(atom); },
     addBond: (bond: Bond) => { bonds.push(bond); },
 
+    getGraphics: () => graphics,
+    setGraphics: (g: Graphic[]) => {
+        graphics = g;
+        let maxId = 0; graphics.forEach(x => { if (x.id > maxId) maxId = x.id; });
+        if (maxId >= nextId) nextId = maxId + 1;
+    },
+    addGraphic: (g: Graphic) => { graphics.push(g); },
+    removeGraphics: (ids: Set<number>) => { graphics = graphics.filter(g => !ids.has(g.id)); },
+    getSelectedGraphicIds: () => selectedGraphicIDs,
+    selectGraphics: (ids: number[]) => { selectedGraphicIDs = new Set(ids); },
+    clearGraphicSelection: () => { selectedGraphicIDs.clear(); },
+
     // ----------------------------
     // HISTORY & MANAGEMENT
     // ----------------------------
@@ -40,6 +54,7 @@ export const state = {
         const snapshot: EditorState = {
             atoms: JSON.parse(JSON.stringify(atoms)),
             bonds: JSON.parse(JSON.stringify(bonds)),
+            graphics: JSON.parse(JSON.stringify(graphics)),
             nextId: nextId,
             currentElement: currentElement
         };
@@ -74,6 +89,7 @@ export const state = {
 
         atoms = lastState.atoms;
         bonds = lastState.bonds;
+        graphics = lastState.graphics ?? [];
         nextId = lastState.nextId;
         currentElement = lastState.currentElement;
 
@@ -88,8 +104,9 @@ export const state = {
         state.saveState();
         atoms = [];
         bonds = [];
+        graphics = [];
+        selectedGraphicIDs.clear();
         nextId = 1;
-        // currentElement behalten wir meistens bei
     }
 
     //Lasso

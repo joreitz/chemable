@@ -27,6 +27,9 @@ import { initStyleMenu } from "./ui/style-menu";
 import { pendingTemplatePreview, templateTargetAtom } from "./chemistry/template-manager";
 import { initMoleculeData } from "./moldata/ui";
 
+import { initShapeMenu } from "./ui/shape-menu";
+import { previewGraphic } from "./graphics/graphics-tool";
+
 const canvas = document.getElementById('chemBoard') as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
@@ -50,6 +53,9 @@ function render() {
         showImplicitHydrogens: uiState.showImplicitHydrogens,
         globalLineWidth: uiState.globalLineWidth,
         atomPadding: uiState.atomPadding,
+        graphics: state.getGraphics(),
+        selectedGraphicIds: state.getSelectedGraphicIds(),
+        graphicPreview: previewGraphic,
     });
 
     if (pendingTemplatePreview) {
@@ -147,5 +153,12 @@ initTextEditor(render);
 initPSEMenu();
 initStyleMenu(render);
 initCubeViewer(render);
+initShapeMenu(render);
+document.getElementById("btn-shapes")?.addEventListener("click", () => {
+    const d = document.getElementById("shape-dialog"); if (d) d.style.display = "block";
+});
+document.getElementById("shape-close")?.addEventListener("click", () => {
+    const d = document.getElementById("shape-dialog"); if (d) d.style.display = "none";
+});
 
 resizeCanvas();
