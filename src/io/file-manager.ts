@@ -146,7 +146,12 @@ export function initFileManager(render: () => void) {
 
     // --- SPEICHERN (.chem) ---
     document.getElementById('btn-save')?.addEventListener('click', () => {
-        const data = JSON.stringify({ atoms: state.getAtoms(), bonds: state.getBonds() });
+        const data = JSON.stringify({
+            version: 2,
+            atoms: state.getAtoms(),
+            bonds: state.getBonds(),
+            graphics: state.getGraphics()
+        });
         const blob = new Blob([data], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -186,6 +191,8 @@ export function initFileManager(render: () => void) {
                     state.saveState();
                     state.setAtoms(parsed.atoms);
                     state.setBonds(parsed.bonds);
+                    state.setGraphics(parsed.graphics ?? []);
+                    state.clearGraphicSelection();
                     render();
                 }
             } catch (err) {

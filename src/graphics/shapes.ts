@@ -7,6 +7,7 @@ export interface ShapeDef {
     fixed?: boolean;                 // per Klick statt Ziehen platziert
     defaults?: Partial<Graphic>;
     build(g: Graphic): Prim[];
+    z?: number; 
 }
 
 const HEAD = 12;
@@ -92,7 +93,7 @@ export const SHAPES: Record<string, ShapeDef> = {
         build: g => [{ rect: { ...bbox(g), r: g.radius ?? 10 } }] },
     box_dashed: { label: "Dashed box", group: "Boxes", defaults: { radius: 6 },
         build: g => [{ rect: { ...bbox(g), r: g.radius ?? 6 }, dash: [7, 5] }] },
-    box_shadow: { label: "Shadow box", group: "Boxes", defaults: { radius: 10 },
+    box_shadow: { label: "Shadow box", group: "Boxes", z: -1, defaults: { radius: 10, z: -1 },
         build: g => [{ rect: { ...bbox(g), r: g.radius ?? 10 }, fillColor: "#ffffff", shadow: true }] },
     ellipse: { label: "Ellipse", group: "Boxes", build: g => {
         const b = bbox(g);
@@ -124,3 +125,5 @@ export const SHAPES: Record<string, ShapeDef> = {
 export function buildPrims(g: Graphic): Prim[] {
     return (SHAPES[g.kind] ?? SHAPES.line).build(g);
 }
+
+export const zOf = (g: Graphic): number => g.z ?? SHAPES[g.kind]?.z ?? 0;

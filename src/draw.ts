@@ -3,7 +3,7 @@ import { getAtomLabel, hasValenceError } from "./chemistry";
 import { calculateBondOffsetDirection } from "./geometry";
 import { Graphic } from "./types";
 import { paintPrims, paintHandles } from "./graphics/primitives";
-import { buildPrims } from "./graphics/shapes";
+import { buildPrims, zOf } from "./graphics/shapes";
 
 export function parseChemicalRichText(text: string): string {
     const subMap: any = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
@@ -73,6 +73,11 @@ export function drawScene(
     
     ctx.save(); 
     ctx.translate(options.panX, options.panY);
+    
+    if (options.graphics) for (const g of options.graphics.filter(q => zOf(q) < 0)) {
+        paintPrims(ctx, buildPrims(g), g.color || options.globalColor, g.lineWidth ?? (options.globalLineWidth ?? 2));
+        if (options.selectedGraphicIds?.has(g.id)) paintHandles(ctx, g);
+    }
 
     if (options.showGrid) {
         ctx.save();
@@ -384,7 +389,7 @@ export function drawScene(
         ctx.setLineDash([]);
     }
 
-    if (options.graphics) for (const g of options.graphics) {
+    if (options.graphics) for (const g of options.graphics.filter(q => zOf(q) >= 0)) {
         paintPrims(ctx, buildPrims(g), g.color || options.globalColor, g.lineWidth ?? (options.globalLineWidth ?? 2));
         if (options.selectedGraphicIds?.has(g.id)) paintHandles(ctx, g);
     }
@@ -393,7 +398,7 @@ export function drawScene(
         paintPrims(ctx, buildPrims(options.graphicPreview), "#007bff", options.graphicPreview.lineWidth ?? 2);
         ctx.restore();
     }
-
+    
     // --- SELEKTION ---
     if (options.selectedAtomIds && options.selectedAtomIds.size > 0) {
         ctx.save(); 

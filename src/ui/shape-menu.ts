@@ -43,6 +43,20 @@ export function initShapeMenu(render: () => void) {
             };
             wrap.appendChild(b);
         });
+        const layerRow = document.createElement("div");
+        layerRow.style.cssText = "display:flex;gap:4px;margin-top:10px;";
+        const mkLayer = (txt: string, z: number) => {
+            const b = document.createElement("button");
+            b.textContent = txt;
+            b.style.cssText = "flex:1;justify-content:center;border:1px solid #ddd;border-radius:6px;font-size:11px;padding:5px;";
+            b.onclick = () => {
+                state.getGraphics().filter(g => state.getSelectedGraphicIds().has(g.id)).forEach(g => { g.z = z; });
+                render();
+            };
+            return b;
+        };
+        layerRow.append(mkLayer("Send back", -1), mkLayer("Bring front", 1));
+        panel.appendChild(layerRow);
         panel.appendChild(wrap);
     });
 

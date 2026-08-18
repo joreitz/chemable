@@ -1,6 +1,6 @@
 {
   "name": "chemable",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "A 2D Chemical Drawing Editor",
   "main": "dist/main.js",
   "repository": {
@@ -19,14 +19,14 @@
   "devDependencies": {
     "electron": "^42.0.1",
     "electron-builder": "^26.9.1",
-    "typescript": "6.0.3",
-    "electron-updater": "^6.3.9"
+    "typescript": "6.0.3"
   },
   "dependencies": {
     "jspdf": "^4.2.0",
     "ml-matrix": "6.5.3",
     "nmr-simulation": "^1.0.21",
-    "svg2pdf.js": "^2.7.0"
+    "svg2pdf.js": "^2.7.0",
+    "electron-updater": "^6.3.9"
   },
   "build": {
     "appId": "com.joreitz.chemable",

@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import { drawScene } from "./draw";
 import { state } from "./state";
 import { primsToSVG, SHADOW_DEF } from "./graphics/primitives";
-import { buildPrims } from "./graphics/shapes";
+import { buildPrims, zOf } from "./graphics/shapes";
 
 function buildSvgRichText(text: string, baseFontSize: number): string {
     const normalizeMap: Record<string, string> = {
@@ -215,7 +215,6 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
                 additions += `  <circle cx="${badgeX}" cy="${badgeY}" r="${badgeRadius}" fill="#fff" stroke="${atom.color || '#000'}" stroke-width="${1.5 * data.scale}" />\n`;
                 
                 const chargeFontSize = Math.max(10 * data.scale, fontSize * 0.6);
-                // FIX: Minus-Zeichen sind im SVG nie mittig. Wir verschieben die Höhe optisch um 12% der Schriftgröße nach unten!
                 const textCenterY = badgeY + (chargeFontSize * 0.12);
                 
                 additions += `  <text font-family="${data.fontToUse}" font-weight="bold" font-size="${chargeFontSize}px" fill="${atom.color || '#000'}" x="${badgeX}" y="${textCenterY}" text-anchor="middle" dominant-baseline="central">${isPositive ? "+" : "-"}</text>\n`;
@@ -238,11 +237,7 @@ export function generateSVG(allAtoms: Atom[], allBonds: Bond[], selectedIds: Set
             svg += additions;
         }
     });
-    if (!isSelection && state.getGraphics().length) {
-        svg += SHADOW_DEF;
-        for (const g of state.getGraphics())
-            svg += primsToSVG(buildPrims(g), g.color || uiState.globalColor, g.lineWidth ?? uiState.globalLineWidth);
-    }
+
     const dataToEmbed = JSON.stringify({ atoms: exportAtoms, bonds: exportBonds });
     svg += `  <desc id="chemable-data">${dataToEmbed}</desc>\n`;
     svg += `</svg>`;
@@ -289,6 +284,14 @@ export function generateHighResPNG(atoms: Atom[], bonds: Bond[], fontSize: numbe
         }
     });
 
+    const exportGraphics = state.getGraphics();
+    for (const g of exportGraphics.filter(q => zOf(q) >= 0)) {
+        const pad = (g.lineWidth ?? uiState.globalLineWidth) + 8;
+        minX = Math.min(minX, g.x1 - pad, g.x2 - pad);
+        maxX = Math.max(maxX, g.x1 + pad, g.x2 + pad);
+        minY = Math.min(minY, g.y1 - pad, g.y2 - pad);
+        maxY = Math.max(maxY, g.y1 + pad, g.y2 + pad);
+    }
     const padding = 40 + fontSize; 
     const width = (maxX - minX) + padding * 2;
     const height = (maxY - minY) + padding * 2;
@@ -315,14 +318,17 @@ export function generateHighResPNG(atoms: Atom[], bonds: Bond[], fontSize: numbe
 
     const exportOptions: any = {
         ...(uiState || {}), 
-        fontSize: fontSize, // Hier nutzen wir den sauberen Parameter!
+        fontSize: fontSize, 
         panX: -minX + padding, 
         panY: -minY + padding,
         showGrid: false,
         selectedAtomId: null,
         selectedAtomIds: new Set<number>(),
         dragStartAtom: null,
-        lassoPath: []
+        lassoPath: [],
+        graphics: exportGraphics,
+        selectedGraphicIds: new Set<number>(),      
+        graphicPreview: null
     };
 
     drawScene(ctx, width, height, atoms, bonds, exportOptions);

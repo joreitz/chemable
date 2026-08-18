@@ -45,5 +45,6 @@ export interface Graphic {
     bow?: number;        
     color?: string;
     lineWidth?: number;
-    radius?: number;     
+    radius?: number;
+    z?: number;     
 }
