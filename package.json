@@ -15,7 +15,7 @@
     "release": "tsc && electron-builder --publish always"
   },
   "author": "Joshua Reitz",
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "devDependencies": {
     "electron": "^42.0.1",
     "electron-builder": "^26.9.1",
